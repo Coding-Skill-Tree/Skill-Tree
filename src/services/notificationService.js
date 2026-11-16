@@ -1,6 +1,6 @@
 const API_URL = "https://skill-tree-notification.matt02416.workers.dev";
 
-export async function sendDiscordNotification(): Promise<void> {
+export async function sendDiscordNotification() {
   try {
     const response = await fetch(API_URL, {
       method: "POST",

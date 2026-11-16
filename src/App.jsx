@@ -1,4 +1,4 @@
-import { sendDiscordNotification } from "./services/notificationService";
+import { sendDiscordNotification } from "./services/notificationService.js";
 
 function App() {
   const handleSendNotification = async () => {
