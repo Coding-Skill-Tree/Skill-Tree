@@ -1,19 +1,9 @@
-import { sendDiscordNotification } from "./services/notificationService.js";
+import Dahboard from "./page/dashboard/Dashboard.jsx";
 
 function App() {
-  const handleSendNotification = async () => {
-    try {
-      await sendDiscordNotification();
-      alert("Discord通知發送成功!");
-    } catch {
-      alert("通知發送失敗，請檢查console");
-    }
-  };
-
   return (
-    <div>
-      <h1>Discord Webhook測試</h1>
-      <button onClick={handleSendNotification}>發送測試通知</button>
+    <div className="app-container">
+      <Dahboard />
     </div>
   );
 }

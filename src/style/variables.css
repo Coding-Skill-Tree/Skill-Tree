@@ -1,0 +1,21 @@
+:root {
+  /* 背景色 */
+  --color-bg: #10130f;
+  --color-surface: #171c16;
+  --color-surface-raised: #1e251c;
+
+  /* 邊框 */
+  --color-border: #30392c;
+
+  /* 文字 */
+  --color-text: #f2f4ed;
+  --color-text-muted: #a6ae9d;
+
+  /* 主題色 */
+  --color-primary: #c6f36a;
+  --color-accent: #ebcb72;
+
+  /* 狀態色 */
+  --color-danger: #f07872;
+  --color-info: #8fc7d1;
+}
