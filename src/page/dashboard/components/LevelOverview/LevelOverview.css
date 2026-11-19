@@ -1,0 +1,9 @@
+/* Current level and progress toward the next level. */
+.level-icon { color: var(--color-primary); background: #c6f36a17; }
+.level-number { margin: 10px 0 13px; color: var(--color-primary); font-size: 30px; font-weight: 750; letter-spacing: -.03em; line-height: 1; }
+.level-progress-copy { display: flex; justify-content: space-between; gap: 8px; color: var(--color-text-muted); font-size: 12px; }
+.level-progress-copy strong { color: var(--color-text); }
+.level-card .progress-track { margin-top: 7px; }
+.progress-level { width: 76%; }
+.level-footnote { margin: 9px 0 0; color: var(--color-text-muted); font-size: 12px; }
+.level-footnote strong { color: var(--color-accent); }

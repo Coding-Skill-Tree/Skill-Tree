@@ -1,0 +1,138 @@
+/* Sidebar base layout and brand. */
+.dashboard-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 28px 18px 20px;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.dashboard-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -.03em;
+}
+
+.brand-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 11px;
+  color: #17200d;
+  background: var(--color-primary);
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.dashboard-brand small {
+  display: block;
+  margin-top: 1px;
+  color: var(--color-text-muted);
+  font-size: 9px;
+  letter-spacing: .15em;
+}
+
+/* Sidebar navigation and current member summary. */
+.sidebar-label {
+  margin: 42px 10px 12px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+
+.dashboard-nav { display: grid; gap: 6px; }
+
+.dashboard-nav > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 0 13px;
+  border-radius: 9px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.dashboard-nav > div > span {
+  width: 20px;
+  color: currentColor;
+  font-size: 18px;
+  text-align: center;
+}
+
+.dashboard-nav > div.is-active {
+  color: var(--color-primary);
+  background: var(--color-surface-raised);
+  box-shadow: inset 2px 0 var(--color-primary);
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: auto;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
+}
+
+.sidebar-avatar {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--color-primary);
+  background: var(--color-surface-raised);
+  font-weight: 700;
+}
+
+.sidebar-user strong,
+.sidebar-user small { display: block; }
+.sidebar-user strong { font-size: 14px; }
+.sidebar-user small { margin-top: 3px; color: var(--color-text-muted); font-size: 12px; }
+.sidebar-status { margin-left: auto; color: var(--color-primary); font-size: 10px; }
+
+/* Replace the fixed sidebar with bottom navigation on tablet and mobile. */
+@media (max-width: 940px) {
+  .dashboard-sidebar {
+    position: fixed;
+    z-index: 5;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 64px;
+    padding: 6px 12px;
+    border-top: 1px solid var(--color-border);
+    border-right: 0;
+    background: var(--color-surface);
+  }
+
+  .dashboard-brand,
+  .sidebar-label,
+  .sidebar-user { display: none; }
+  .dashboard-nav { display: grid; height: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+
+  .dashboard-nav > div {
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: 0;
+    padding: 4px;
+    font-size: 11px;
+  }
+
+  .dashboard-nav > div > span { width: auto; font-size: 17px; }
+}

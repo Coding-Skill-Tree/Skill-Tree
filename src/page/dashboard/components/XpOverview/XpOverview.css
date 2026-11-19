@@ -1,0 +1,6 @@
+/* XP card: distinguish lifetime points from the recent reward. */
+.xp-icon { color: var(--color-accent); background: #ebcb7217; }
+.summary-number { margin: 14px 0 9px; font-size: clamp(29px, 3vw, 38px); font-weight: 750; letter-spacing: -.045em; line-height: 1; }
+.summary-number span { color: var(--color-text-muted); font-size: 14px; font-weight: 550; letter-spacing: 0; }
+.xp-recent { display: flex; align-items: center; gap: 6px; color: var(--color-accent); font-size: 13px; }
+.xp-recent span:last-child { color: var(--color-text-muted); }

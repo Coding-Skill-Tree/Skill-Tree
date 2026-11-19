@@ -1,0 +1,28 @@
+/* Overall skill completion summary and counts by learning state. */
+.completion-rate { color: var(--color-primary); font-size: 32px; font-weight: 750; letter-spacing: -.04em; }
+.completion-rate small { font-size: 15px; }
+.panel-description { margin: 8px 0 18px; color: var(--color-text-muted); font-size: 14px; }
+.skill-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px 0 18px; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+.skill-stats > div { display: grid; grid-template-columns: 19px 1fr; align-items: center; column-gap: 7px; }
+.skill-stats strong { font-size: 18px; }
+.skill-stats > div > span:last-child { grid-column: 2; color: var(--color-text-muted); font-size: 12px; }
+.stat-symbol { grid-row: span 2; font-size: 16px; text-align: center; }
+.completed-symbol { color: var(--color-primary); }
+.progress-symbol { color: var(--color-info); }
+.locked-symbol { color: var(--color-text-muted); }
+
+/* Progress by the four official skill stages. */
+.category-list { display: grid; gap: 14px; padding-top: 17px; }
+.category-label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: var(--color-text-muted); font-size: 13px; }
+.category-label strong { color: var(--color-text); font-weight: 550; }
+.progress-web { width: 100%; }
+.progress-style { width: 63%; }
+.progress-js,
+.progress-react { width: 0; }
+
+/* Prevent the compact stat labels from colliding on mobile. */
+@media (max-width: 639px) {
+  .skill-stats { gap: 4px; }
+  .skill-stats > div { column-gap: 5px; }
+  .skill-stats > div > span:last-child { font-size: 11px; }
+}

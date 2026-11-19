@@ -1,0 +1,15 @@
+/* Profile summary card and avatar. */
+.profile-card { display: flex; align-items: center; gap: 17px; }
+.profile-avatar { flex: 0 0 auto; width: 76px; height: 76px; border: 2px solid var(--color-border); border-radius: 50%; object-fit: cover; }
+.profile-info-text { min-width: 0; }
+.profile-info-text h2 { margin: 4px 0 8px; font-size: 22px; line-height: 1.25; }
+.profile-detail { display: flex; align-items: center; gap: 7px; margin: 4px 0 0; color: var(--color-text-muted); font-size: 13px; overflow-wrap: anywhere; }
+.profile-detail span { color: var(--color-text-subtle, #929b89); }
+
+/* Keep the avatar and contact details readable on narrow screens. */
+@media (max-width: 639px) {
+  .profile-card { align-items: center; gap: 14px; }
+  .profile-avatar { width: 64px; height: 64px; }
+  .profile-info-text h2 { font-size: 20px; }
+  .profile-detail { font-size: 12px; }
+}

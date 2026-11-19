@@ -1,0 +1,164 @@
+/* Dashboard shell: page columns and responsive content grid. */
+.dashboard {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 248px minmax(0, 1fr);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.dashboard-layout { min-width: 0; }
+
+/* Shared card surface and common section heading. */
+.profile-card,
+.summary-card,
+.panel-card {
+  height: 100%;
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .11em;
+}
+
+.panel-card { padding: 24px; }
+
+/* Shared layout for the XP and level summary cards. */
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.card-topline { display: flex; align-items: center; gap: 10px; }
+
+.summary-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 18px;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.panel-heading h2 {
+  margin: 5px 0 0;
+  font-size: 20px;
+  letter-spacing: -.025em;
+}
+
+/* Shared progress bar structure used by level and skill cards. */
+.progress-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--color-surface-raised);
+}
+
+.progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+}
+
+/* Dashboard section placement on wide screens. */
+.dashboard-main {
+  display: grid;
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 30px 36px 48px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-areas:
+    "profile profile profile xp xp xp level level level level level level"
+    "skills skills skills skills skills skills skills skills recent recent recent recent"
+    "achievements achievements achievements achievements achievements achievements achievements achievements achievements achievements achievements achievements";
+  gap: 18px;
+}
+
+.dashboard-profile { grid-area: profile; }
+.dashboard-xp { grid-area: xp; }
+.dashboard-level { grid-area: level; }
+.dashboard-skill-progress { grid-area: skills; min-width: 0; }
+.dashboard-recent-activity { grid-area: recent; min-width: 0; }
+.dashboard-achievement-list { grid-area: achievements; min-width: 0; }
+
+.dashboard-profile,
+.dashboard-xp,
+.dashboard-level { min-width: 0; }
+
+/* Collapse the dashboard grid as the available content width narrows. */
+@media (max-width: 1279px) {
+  .dashboard { grid-template-columns: 220px minmax(0, 1fr); }
+  .dashboard-main {
+    padding-inline: 24px;
+    grid-template-areas:
+      "profile profile xp xp"
+      "level level level level"
+      "skills skills recent recent"
+      "achievements achievements achievements achievements";
+  }
+}
+
+@media (max-width: 940px) {
+  .dashboard { display: block; padding-bottom: 68px; }
+  .dashboard-main {
+    gap: 14px;
+    padding: 20px 22px 34px;
+    grid-template-areas:
+      "profile profile"
+      "xp level"
+      "skills skills"
+      "recent recent"
+      "achievements achievements";
+  }
+
+  .profile-card,
+  .summary-card,
+  .panel-card { padding: 20px; }
+}
+
+@media (max-width: 639px) {
+  .dashboard-main {
+    gap: 12px;
+    padding: 16px 16px 28px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "profile"
+      "xp"
+      "level"
+      "skills"
+      "recent"
+      "achievements";
+  }
+
+  .panel-card { padding: 18px; }
+  .panel-heading h2 { font-size: 19px; }
+  .summary-card { min-height: 160px; }
+}
+
+/* Respect the system setting for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
