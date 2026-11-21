@@ -1,0 +1,32 @@
+/* 建立角色頁的補充樣式。
+   box-sizing、body 背景與字型、按鈕與連結的 focus 外框等基礎設定，
+   都來自共用的 src/style/reset.css、src/style/variables.css 和 src/App.css，
+   這裡只放共用檔沒有的部分。 */
+
+/* 輸入欄位的 focus 外框，與 App.css 的按鈕、連結一致 */
+input:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 尊重減少動態效果的設定 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
