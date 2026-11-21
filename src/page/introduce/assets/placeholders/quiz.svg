@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" font-family="Noto Sans TC, Microsoft JhengHei, sans-serif">
+  <!-- 闖關學習示意：學習任務卡（任務名稱、學習目標、答題回饋、開始學習按鈕），參考設計稿右側任務欄 -->
+  <rect width="320" height="180" fill="#171C16"/>
+  <rect x="24" y="14" width="272" height="152" rx="12" fill="#1E251C" stroke="#30392C"/>
+  <path d="M40 30v12M40 31h9l-2.5 3.5 2.5 3.5h-9" stroke="#C6F36A" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+  <text x="56" y="40" fill="#C6F36A" font-size="11" font-weight="700">學習任務</text>
+  <rect x="244" y="28" width="38" height="16" rx="5" fill="none" stroke="#C6F36A" stroke-opacity="0.6"/>
+  <text x="263" y="40" text-anchor="middle" fill="#C6F36A" font-size="10" font-weight="700">Lv. 6</text>
+  <!-- 任務標題 -->
+  <rect x="40" y="54" width="30" height="30" rx="7" fill="#C6F36A"/>
+  <rect x="47" y="61" width="16" height="16" rx="2" stroke="#10130F" stroke-width="2" fill="none"/>
+  <path d="M50 66h10M50 70h10M50 74h6" stroke="#10130F" stroke-width="1.6"/>
+  <text x="80" y="75" fill="#F2F4ED" font-size="17" font-weight="800">表單基礎</text>
+  <!-- 學習目標 -->
+  <g font-size="10" fill="#A6AE9D">
+    <path d="M42 102l3 3 6-6" stroke="#C6F36A" stroke-width="2" fill="none"/>
+    <text x="58" y="106">了解 &lt;form&gt; 的基本結構</text>
+    <path d="M42 118l3 3 6-6" stroke="#C6F36A" stroke-width="2" fill="none"/>
+    <text x="58" y="122">熟悉常見的輸入欄位</text>
+  </g>
+  <!-- 答題回饋 -->
+  <rect x="200" y="96" width="82" height="30" rx="8" fill="#171C16" stroke="#C6F36A" stroke-opacity="0.5"/>
+  <circle cx="214" cy="111" r="7" fill="#C6F36A"/>
+  <path d="M210.5 111l2.5 2.5 4.5-4.5" stroke="#10130F" stroke-width="1.8" fill="none"/>
+  <text x="227" y="115" fill="#C6F36A" font-size="11" font-weight="700">答對了！</text>
+  <!-- 開始學習按鈕 -->
+  <rect x="40" y="136" width="242" height="22" rx="6" fill="#C6F36A"/>
+  <path d="M130 142v10l8-5z" fill="#10130F"/>
+  <text x="144" y="151" fill="#10130F" font-size="11" font-weight="800">開始學習 →</text>
+</svg>

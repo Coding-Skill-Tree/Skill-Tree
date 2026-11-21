@@ -1,0 +1,748 @@
+/* ==========================================================
+   Skill Tree 歡迎頁面（模組 A，第一階段切版）
+   依《Skill Tree｜團隊共用開發規範 v1》第 7 節：
+   - 顏色只用共用 CSS Variables（7-1）
+   - CSS class 使用 kebab-case（7-2）
+   - Mobile-first，斷點 640／768／941／1024／1280（7-3）
+   - 按鈕至少 44px、focus 狀態、不只靠顏色、支援減少動態效果（7-4）
+   視覺參考「HTML 學習地圖」設計稿：品牌標誌、技能卡、學習地圖節點、進度條、山丘旗子。
+   ========================================================== */
+
+/* ---------- 共用樣式 ----------
+   在 main.jsx 依序引入：
+   - src/style/reset.css：清除預設的邊距、清單符號，標題粗細也會被清掉（下方各標題再補回）
+   - src/style/variables.css：顏色變數，這裡不再重複定義
+   - src/App.css：box-sizing、body 背景／文字色／字型／行高、按鈕與連結的 focus 外框
+   - src/style/button.css：.btn、.btn-primary、.btn-secondary、.btn-large
+   以下只放歡迎頁自己用的尺寸、字型與補充。 */
+:root {
+  --radius-card: 12px;
+  --space-card: 16px;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  color-scheme: dark;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* reset.css 沒有設定連結顏色，補回主題綠 */
+a {
+  color: var(--color-primary);
+}
+
+/* 非按鈕／連結的元素（例如 tabindex 元素）focus 外框也用黃色，和 App.css 一致 */
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- 版面 ---------- */
+.welcome-main {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ---------- 頁首 ---------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--color-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brand-logo {
+  flex: 0 0 auto;
+}
+
+.site-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.site-brand-name {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+/* 副標題：手機先隱藏，避免和登入／註冊擠在一起 */
+.site-brand-tagline {
+  display: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.site-header-nav {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- Banner ---------- */
+.hero-banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 32px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+/* 右上角的山丘＋旗子（裝飾）：手機會壓到標題，所以 640px 以上才顯示 */
+.hero-decoration {
+  display: none;
+  position: absolute;
+  top: 24px;
+  right: 0;
+  width: 220px;
+  height: auto;
+  pointer-events: none;
+}
+
+.hero-content {
+  position: relative;
+}
+
+/* 小標：等寬字＋字距＋右側短線 */
+.hero-eyebrow,
+.section-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+}
+
+.hero-eyebrow::after {
+  content: "";
+  width: 32px;
+  height: 1px;
+  background: var(--color-primary);
+}
+
+.hero-eyebrow {
+  margin-bottom: 8px;
+}
+
+.hero-title {
+  font-size: 28px;
+  font-weight: 800; /* reset.css 會清掉標題的粗體，這裡補回來（以下各標題同） */
+  line-height: 1.3;
+}
+
+.hero-title::after {
+  content: "";
+  display: block;
+  width: 56px;
+  height: 4px;
+  margin-top: 12px;
+  border-radius: 2px;
+  background: var(--color-primary);
+}
+
+.hero-description {
+  margin: 14px 0 20px;
+  color: var(--color-text-muted);
+  font-size: 17px;
+}
+
+/* ---------- 技能卡（純展示） ---------- */
+.skill-cards {
+  position: relative;
+}
+
+.skill-cards-title {
+  margin-bottom: 12px;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.skill-cards-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.skill-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.skill-card-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+}
+
+.skill-card-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.skill-card-js {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.skill-card-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.skill-card-name {
+  font-weight: 800;
+}
+
+.skill-card-description {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* ---------- 區塊 ---------- */
+.welcome-section {
+  padding: 20px var(--space-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.section-eyebrow {
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.section-title {
+  margin-bottom: 16px;
+  color: var(--color-primary);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* ---------- 卡片（網站介紹、獎勵機制） ---------- */
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.illustration-card {
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.illustration-image {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.illustration-body {
+  padding: var(--space-card);
+}
+
+.illustration-title {
+  margin-bottom: 6px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.illustration-description {
+  color: var(--color-text-muted);
+}
+
+.illustration-sample {
+  margin-top: 10px;
+  color: var(--color-accent);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+/* ---------- 關卡長這樣（學習地圖風格） ---------- */
+.level-section .section-title {
+  margin-bottom: 4px;
+}
+
+.level-zone {
+  margin-bottom: 20px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+/* 手機與平板（< 1024px）：直向排列，左邊是節點、右邊是資訊，節點之間用直線連接 */
+.level-map {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 4px 0;
+}
+
+.level-node {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  column-gap: 14px;
+  align-items: center;
+  padding-bottom: 18px;
+}
+
+/* 連到下一關的線：已通過的路段是實線，其餘是虛線 */
+.level-node:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 52px;
+  bottom: 0;
+  left: 25px;
+  border-left: 3px dashed var(--color-border);
+}
+
+.level-node-done:not(:last-child)::after {
+  border-left-style: solid;
+  border-left-color: var(--color-primary);
+}
+
+.level-node-mark {
+  position: relative;
+  z-index: 1;
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 3px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.level-node-done .level-node-mark {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-bg);
+}
+
+.level-node-current .level-node-mark {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+/* Boss：圓角方形＋雙線框＋旗子圖示 */
+.level-node-boss .level-node-mark {
+  border-radius: 14px;
+  border-style: double;
+  border-width: 5px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.level-boss-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.level-boss-label {
+  margin-top: -6px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* 「下一個」小標籤 */
+.level-next-badge {
+  grid-column: 2;
+  justify-self: start;
+  margin-bottom: 4px;
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-bg);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.level-node-info {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.level-node-name {
+  font-weight: 700;
+}
+
+.level-node-locked .level-node-name {
+  color: var(--color-text-muted);
+}
+
+.level-stars {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.level-star {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.level-star.is-earned {
+  color: var(--color-accent);
+  opacity: 1;
+}
+
+/* 狀態標籤：圖示＋文字，不只靠顏色 */
+.level-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.level-chip-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.level-node-done .level-chip {
+  color: var(--color-primary);
+}
+
+.level-node-current .level-chip {
+  color: var(--color-accent);
+}
+
+.level-node-locked .level-chip {
+  color: var(--color-text-muted);
+}
+
+/* 圖例 */
+.level-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  margin-top: 12px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.level-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.level-legend-dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface-raised);
+}
+
+.level-legend-dot svg {
+  width: 12px;
+  height: 12px;
+}
+
+.level-legend-item.level-node-done .level-legend-dot {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-bg);
+}
+
+.level-legend-item.level-node-current .level-legend-dot {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* 學習進度條 */
+.level-progress {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.level-progress-label {
+  font-weight: 700;
+}
+
+.level-progress-bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-border);
+}
+
+.level-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+}
+
+.level-progress-text {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+/* ---------- 敬請期待（頁面最下面） ---------- */
+.coming-soon {
+  position: relative;
+  overflow: hidden;
+  padding: 32px 20px 48px;
+  border: 1px dashed var(--color-accent);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.coming-soon-decoration {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 200px;
+  height: auto;
+  pointer-events: none;
+}
+
+.coming-soon-title,
+.coming-soon-description,
+.coming-soon .btn {
+  position: relative;
+}
+
+.coming-soon-title {
+  color: var(--color-accent);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.coming-soon-description {
+  margin: 6px 0 18px;
+  color: var(--color-text-muted);
+}
+
+/* ---------- 斷點（Mobile-first） ---------- */
+
+/* 640px 以上：大手機 */
+@media (min-width: 640px) {
+  .card-grid-2,
+  .skill-cards-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-title {
+    font-size: 34px;
+  }
+
+  .site-brand-tagline {
+    display: block;
+  }
+
+  .hero-decoration {
+    display: block;
+    width: 300px;
+  }
+
+  .level-progress {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .level-progress-text {
+    grid-column: auto;
+  }
+}
+
+/* 768px 以上：平板直向 */
+@media (min-width: 768px) {
+  .welcome-main {
+    padding: 24px 24px 64px;
+    gap: 28px;
+  }
+
+  .site-header {
+    padding: 12px 24px;
+  }
+
+  .hero-banner {
+    padding: 44px 36px;
+  }
+
+  .coming-soon-decoration {
+    width: 280px;
+  }
+}
+
+/* 941px 以上：平板橫向 */
+@media (min-width: 941px) {
+  .card-grid-3,
+  .skill-cards-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* 1024px 以上：桌機。關卡改成橫向一排，節點之間用橫線連接 */
+@media (min-width: 1024px) {
+  .hero-title {
+    font-size: 40px;
+  }
+
+  .hero-decoration {
+    width: 380px;
+  }
+
+  .skill-cards-list {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .welcome-section {
+    padding: 24px;
+  }
+
+  .level-map {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    padding: 0;
+  }
+
+  .level-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 30px 0 0; /* 上方留給「下一個」標籤，讓所有節點對齊 */
+    text-align: center;
+  }
+
+  .level-node:not(:last-child)::after {
+    top: 56px; /* 30px 上方空間＋節點高度的一半 */
+    bottom: auto;
+    left: 50%;
+    width: 100%;
+    border-left: 0;
+    border-top: 3px dashed var(--color-border);
+  }
+
+  .level-node-done:not(:last-child)::after {
+    border-top-style: solid;
+    border-top-color: var(--color-primary);
+  }
+
+  .level-next-badge {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    margin: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  .level-node-info {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .level-node-name {
+    font-size: 14px;
+  }
+}
+
+/* 1280px 以上：大桌機 */
+@media (min-width: 1280px) {
+  .welcome-main {
+    gap: 32px;
+  }
+}
+
+/* 尊重減少動態效果的設定 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
