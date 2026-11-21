@@ -1,0 +1,33 @@
+.page-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.page-status-message {
+  color: var(--color-text-muted);
+  font-size: 16px;
+}
+
+.page-status[role="alert"] .page-status-message {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.page-status-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: page-status-spin 0.8s linear infinite;
+}
+
+@keyframes page-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
