@@ -93,10 +93,15 @@ function parseMembersQuery(query) {
 
 async function readMemberDetails(database, memberId) {
   const result = await database.query(
-    `SELECT u.id::text AS id, p.nickname, p.avatar_id AS "avatarId", u.email_normalized AS email,
+    `SELECT u.id::text AS id, p.nickname, p.avatar_id AS "avatarId", p.role, p.level,
+            u.email_normalized AS email,
             u.created_at AS "createdAt", p.route AS "learningRoute",
             p.onboarding_completed AS "onboardingCompleted",
-            false AS "googleLinked", (u.suspended_at IS NOT NULL) AS suspended,
+            EXISTS (
+              SELECT 1 FROM member_auth_identities identity
+              WHERE identity.user_id = u.id AND identity.provider = 'google'
+            ) AS "googleLinked",
+            (u.suspended_at IS NOT NULL) AS suspended,
             u.suspended_at AS "suspendedAt"
      FROM users u
      LEFT JOIN member_profiles p ON p.user_id = u.id
@@ -125,7 +130,7 @@ async function readMemberDetails(database, memberId) {
   return {
     id: member.id,
     userId: member.id,
-    role: 'member',
+    role: member.role,
     username: member.nickname,
     nickname: member.nickname,
     avatarId: member.avatarId,
@@ -137,7 +142,7 @@ async function readMemberDetails(database, memberId) {
     suspended: member.suspended,
     suspendedAt: member.suspendedAt ? new Date(member.suspendedAt).toISOString() : null,
     xp: Number.isSafeInteger(xp) ? xp : null,
-    level: null,
+    level: member.level,
     courseProgress: progressResult.rows,
   };
 }

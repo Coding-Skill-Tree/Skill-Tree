@@ -49,10 +49,11 @@ Vite 將 `/api` 代理至 `http://127.0.0.1:3000`。前端和後端需同時執�
 - `/api/auth/*`、`GET /api/me`：會員註冊、Email 驗證、登入、登出與會員狀態。
 - `/api/admin/auth/login`、`GET /api/admin/me`、`POST /api/admin/auth/logout`：獨立管理員 session。
 - `/api/admin/questions`：管理員題庫查詢、新增、編輯、軟刪除、分類／技能選項與總覽摘要。
+- `/api/admin/members`、`/api/admin/members/:id`：A09 會員搜尋與分頁、A10 會員詳情；詳情提供角色、Google 綁定、XP、等級、學習進度及停權／恢復操作。
 - `GET /api/progress`：登入會員讀取 `catalogVersion`、`revision`、`completedSkillIds`。
 
-成功回應使用 `{ "success": true, "data": ... }`，錯誤使用 `{ "success": false, "error": { "code", "message", "requestId", "details" } }`。BIGINT ID 以字串傳送，時間使用 UTC ISO 8601。管理員會員 API 對齊 A 組第一階段假 API 欄位；XP 與分類進度讀取現有帳本和完成紀錄，等級公式與 Google 登入資料尚未納入目前 schema。前端共用 API client 在 `src/services/api.js`；管理員登入和題庫 adapter 分別在 `src/services/adminAuth.js`、`src/services/adminQuestions.js`。
+成功回應使用 `{ "success": true, "data": ... }`，錯誤使用 `{ "success": false, "error": { "code", "message", "requestId", "details" } }`。BIGINT ID 以字串傳送，時間使用 UTC ISO 8601。管理員會員 API 對齊 A 組第一階段假 API 欄位；角色和等級存於會員資料，等級公式仍待小組確認；Google 綁定資料由 `member_auth_identities` 保存，但 OAuth 串接尚未實作。XP 與分類進度分別讀取帳本和完成紀錄。前端共用 API client 在 `src/services/api.js`；管理員登入和題庫 adapter 分別在 `src/services/adminAuth.js`、`src/services/adminQuestions.js`。
 
-題目使用技能節點 ID 關聯分類，選項固定三個，`correctChoice` 是從 0 開始的索引。資料庫進度表使用 `user_skill_completions`，由新增 migration 006 將舊 scaffold 表名 `completed_skills` 遷移至 Issue #1 討論的共用名稱；既有 migration 保持不變。
+題目使用技能節點 ID 關聯分類，選項固定三個，`correctChoice` 是從 0 開始的索引。資料庫進度表使用 `user_skill_completions`，migration 006 將舊 scaffold 表名 `completed_skills` 遷移至 Issue #1 討論的共用名稱；migration 007 增加會員角色、等級與 Google 綁定資料。等級計算規則和 Google OAuth 流程仍待小組確認，既有 migration 保持不變。
 
 C 負責測驗 UI、測驗開始／作答／評分／歷史 API；本次沒有新增這些測驗端點。進度 API 是 E 提供的共用讀取介面。尚未接入正式部署環境、正式 SMTP 或 production 資料庫，請以各組員完成本機 migrations 與 API health 檢查作為環境驗收依據。
