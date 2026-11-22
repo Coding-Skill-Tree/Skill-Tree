@@ -536,6 +536,34 @@ select.question-form-control { padding-right: 35px; color-scheme: dark; }
   .filter-reset-button { justify-self: start; }
 }
 
+
+
+/* The six-column table needs more than 640px of usable space; stack rows before it overflows. */
+@media (min-width: 640px) and (max-width: 767px) {
+  .question-table-wrap { overflow: visible; }
+  .question-table { display: block; min-width: 0; }
+  .question-table thead { display: none; }
+  .question-table tbody { display: grid; }
+  .question-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 13px 14px; border-bottom: 1px solid #30392c; }
+  .question-table tbody tr:last-child { border-bottom: 0; }
+  .question-table td,.question-table th { display: flex; height: auto; min-width: 0; align-items: center; padding: 0; border: 0; }
+  .question-table th:first-child,.question-table td:first-child,.question-table th:last-child,.question-table td:last-child { padding: 0; }
+  .question-table td[data-label="題目編號"] { grid-column: 1; grid-row: 1; }
+  .question-table td[data-label="題目內容"] { grid-column: 1 / -1; grid-row: 2; }
+  .question-table td[data-label="技能分類"] { grid-column: 1; grid-row: 3; }
+  .question-table td[data-label="狀態"] { grid-column: 2; grid-row: 3; justify-self: end; }
+  .question-table td[data-label="更新時間"] { grid-column: 1 / -1; grid-row: 4; }
+  .question-table td[data-label="操作"] { grid-column: 2; grid-row: 1; justify-self: end; }
+  .question-table td[data-label="技能分類"]::before,.question-table td[data-label="更新時間"]::before { margin-right: 7px; color: #8d9884; font-size: 14px; }
+  .question-table td[data-label="技能分類"]::before { content: "分類"; }
+  .question-table td[data-label="更新時間"]::before { content: "更新"; }
+  .question-prompt-link { max-width: none; overflow: visible; font-size: 13px; text-overflow: unset; white-space: normal; }
+  .question-category { max-width: 190px; }
+  .question-updated { font-size: 14px; }
+  .question-pagination { align-items: flex-start; flex-direction: column; gap: 9px; padding: 13px 14px; }
+  .pagination-controls { width: 100%; justify-content: flex-end; }
+  .question-results-range { font-size: 14px; }
+}
 @media (max-width: 639px) {
   .admin-topbar { height: 60px; padding-inline: 16px; }
   .admin-topbar-right { gap: 10px; }
