@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" font-family="Noto Sans TC, Microsoft JhengHei, sans-serif">
+  <!-- 成長紀錄示意：學習者卡片（頭像、等級、XP 進度條）＋小山丘與旗子，參考設計稿左側欄 -->
+  <rect width="320" height="180" fill="#171C16"/>
+  <path d="M0 180 C60 150 110 158 160 140 C200 126 230 104 262 102 C290 100 306 130 320 140 L320 180Z" fill="#C6F36A" opacity="0.1"/>
+  <path d="M120 180 C170 160 210 150 245 124 C262 112 276 110 290 122 C302 134 312 150 320 156 L320 180Z" fill="#C6F36A" opacity="0.18"/>
+  <line x1="262" y1="102" x2="262" y2="76" stroke="#A6AE9D" stroke-width="2"/>
+  <path d="M263 76l18 6-18 6z" fill="#C6F36A"/>
+  <!-- 學習者卡片 -->
+  <rect x="28" y="30" width="220" height="86" rx="12" fill="#1E251C" stroke="#30392C"/>
+  <!-- 角色頭像：巫師（與建立角色頁的 avatar-06 巫師圖相同，裁成圓形） -->
+  <defs>
+    <clipPath id="avatar-clip"><circle cx="68" cy="73" r="23"/></clipPath>
+  </defs>
+  <g clip-path="url(#avatar-clip)">
+    <svg x="44" y="49" width="48" height="48" viewBox="0 0 12 12" shape-rendering="crispEdges">
+      <rect x="0" y="0" width="12" height="12" fill="#d7b4e8"/>
+      <rect x="2" y="10" width="8" height="2" fill="#2f2f6b"/>
+      <rect x="3" y="3" width="6" height="7" fill="#f2c9a0"/>
+      <rect x="3" y="1" width="6" height="2" fill="#6b2f8f"/>
+      <rect x="2" y="2" width="1" height="9" fill="#6b2f8f"/>
+      <rect x="9" y="2" width="1" height="9" fill="#6b2f8f"/>
+      <rect x="4" y="6" width="1" height="1" fill="#1b1f1a"/>
+      <rect x="7" y="6" width="1" height="1" fill="#1b1f1a"/>
+      <rect x="5" y="8" width="2" height="1" fill="#b5524a"/>
+    </svg>
+  </g>
+  <circle cx="68" cy="73" r="24" fill="none" stroke="#C6F36A" stroke-width="2"/>
+  <text x="104" y="62" fill="#F2F4ED" font-size="13" font-weight="800">前端學習者</text>
+  <text x="182" y="62" fill="#C6F36A" font-size="13" font-weight="800">Lv.12</text>
+  <rect x="104" y="72" width="128" height="8" rx="4" fill="#30392C"/>
+  <rect x="104" y="72" width="109" height="8" rx="4" fill="#C6F36A"/>
+  <text x="104" y="98" fill="#A6AE9D" font-size="10">3,420 / 4,000 XP</text>
+  <path d="M214 96l6-7 6 7h-4v6h-4v-6z" fill="#EBCB72"/>
+  <!-- 標語 -->
+  <text x="28" y="146" fill="#F2F4ED" font-size="12" font-weight="700">今天學一點，</text>
+  <text x="28" y="164" fill="#F2F4ED" font-size="12" font-weight="700">明天的你會更強！</text>
+</svg>

@@ -1,0 +1,65 @@
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 60px;
+  padding: 8px 12px 8px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.profile-brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-text);
+  font-size: 18px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.profile-header-nav {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-header-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--color-primary);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  white-space: nowrap;
+}
+
+.profile-header-link:hover {
+  color: var(--color-text);
+}
+
+/* 目前所在頁：底色＋粗字＋取消底線，不只靠顏色 */
+.profile-header-link[aria-current="page"] {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+@media (min-width: 768px) {
+  .profile-header {
+    padding: 8px 24px;
+  }
+
+  .profile-header-nav {
+    gap: 8px;
+  }
+}

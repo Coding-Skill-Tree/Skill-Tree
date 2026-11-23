@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" font-family="Noto Sans TC, Microsoft JhengHei, sans-serif">
+  <!-- 技能樹地圖示意：學習地圖節點（已完成／進行中／下一個／未開始），參考 HTML 學習地圖設計稿 -->
+  <rect width="320" height="180" fill="#171C16"/>
+  <text x="20" y="32" fill="#C6F36A" font-size="9" font-family="Consolas, monospace" letter-spacing="1.5">HTML LEARNING MAP</text>
+  <!-- 連線：已完成實線、之後虛線 -->
+  <path d="M38 96 Q62 108 88 100 Q114 92 138 98" stroke="#C6F36A" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M138 98 Q164 104 188 98 Q214 92 238 100 Q262 108 284 96" stroke="#A6AE9D" stroke-width="2.5" fill="none" stroke-dasharray="5 6"/>
+  <!-- 已完成 -->
+  <circle cx="38" cy="96" r="17" fill="#C6F36A"/>
+  <text x="38" y="101" text-anchor="middle" fill="#10130F" font-size="13" font-weight="700" font-family="Consolas, monospace">&lt;/&gt;</text>
+  <circle cx="88" cy="100" r="17" fill="#C6F36A"/>
+  <path d="M80 98 88 94 96 98 88 102Z M80 103 88 107 96 103" stroke="#10130F" stroke-width="2" fill="none" stroke-linejoin="round"/>
+  <!-- 進行中 -->
+  <circle cx="138" cy="98" r="17" fill="#1E251C" stroke="#C6F36A" stroke-width="3"/>
+  <rect x="130" y="91" width="16" height="13" rx="2" stroke="#C6F36A" stroke-width="2" fill="none"/>
+  <path d="M132 102 137 97 141 101 146 96" stroke="#C6F36A" stroke-width="1.8" fill="none"/>
+  <!-- 下一個 -->
+  <rect x="166" y="58" width="44" height="16" rx="8" fill="#C6F36A"/>
+  <text x="188" y="70" text-anchor="middle" fill="#10130F" font-size="10" font-weight="700">下一個</text>
+  <circle cx="188" cy="98" r="24" fill="none" stroke="#C6F36A" stroke-opacity="0.25" stroke-width="5"/>
+  <circle cx="188" cy="98" r="18" fill="#171C16" stroke="#C6F36A" stroke-width="3"/>
+  <rect x="180" y="91" width="16" height="14" rx="2" stroke="#C6F36A" stroke-width="2" fill="none"/>
+  <path d="M183 96h10M183 100h10" stroke="#C6F36A" stroke-width="1.6"/>
+  <!-- 未開始 -->
+  <circle cx="238" cy="100" r="16" fill="#1E251C" stroke="#30392C" stroke-width="2.5"/>
+  <text x="238" y="105" text-anchor="middle" fill="#A6AE9D" font-size="12" font-weight="700" font-family="Consolas, monospace">&lt;/&gt;</text>
+  <circle cx="284" cy="96" r="16" fill="#1E251C" stroke="#30392C" stroke-width="2.5"/>
+  <path d="M279 105V87M279 88h10l-3 4 3 4h-10" stroke="#A6AE9D" stroke-width="2" fill="none" stroke-linejoin="round"/>
+  <!-- 狀態標籤 -->
+  <g font-size="9" font-weight="700" text-anchor="middle">
+    <rect x="16" y="124" width="44" height="15" rx="7.5" fill="none" stroke="#C6F36A"/>
+    <text x="38" y="135" fill="#C6F36A">✓ 已完成</text>
+    <rect x="66" y="128" width="44" height="15" rx="7.5" fill="none" stroke="#C6F36A"/>
+    <text x="88" y="139" fill="#C6F36A">✓ 已完成</text>
+    <rect x="116" y="126" width="44" height="15" rx="7.5" fill="none" stroke="#EBCB72"/>
+    <text x="138" y="137" fill="#EBCB72">▶ 進行中</text>
+    <rect x="218" y="128" width="40" height="15" rx="7.5" fill="none" stroke="#A6AE9D"/>
+    <text x="238" y="139" fill="#A6AE9D">未開始</text>
+    <rect x="264" y="124" width="40" height="15" rx="7.5" fill="none" stroke="#A6AE9D"/>
+    <text x="284" y="135" fill="#A6AE9D">未開始</text>
+  </g>
+  <!-- 進度條 -->
+  <rect x="20" y="156" width="200" height="6" rx="3" fill="#30392C"/>
+  <rect x="20" y="156" width="100" height="6" rx="3" fill="#C6F36A"/>
+  <text x="300" y="162" text-anchor="end" fill="#A6AE9D" font-size="10">4 / 8 節點</text>
+</svg>

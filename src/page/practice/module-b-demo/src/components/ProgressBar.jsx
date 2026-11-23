@@ -1,0 +1,2 @@
+import React from 'react';
+export default function ProgressBar({id,label,value,max=100,text}) {return <footer className="map-footer"><label htmlFor={id}>{label}</label><progress id={id} value={value} max={max}/><span>{text}</span></footer>;}

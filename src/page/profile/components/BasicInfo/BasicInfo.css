@@ -1,0 +1,70 @@
+/* 手機（< 640px）：單欄，標籤在上、內容在下 */
+.basic-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 16px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.basic-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.basic-info-label {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.basic-info-value {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Email 可能很長：允許在任何位置換行，避免撐出水平捲軸 */
+.basic-info-email {
+  overflow-wrap: anywhere;
+}
+
+.basic-info-avatar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.basic-info-avatar-image {
+  display: block;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  image-rendering: pixelated;
+}
+
+/* 640px 以上：標籤與內容並排成兩欄 */
+@media (min-width: 640px) {
+  .basic-info {
+    gap: 14px;
+    padding: 20px 24px;
+  }
+
+  .basic-info-item {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
+  }
+
+  .basic-info-label {
+    font-size: 15px;
+  }
+}

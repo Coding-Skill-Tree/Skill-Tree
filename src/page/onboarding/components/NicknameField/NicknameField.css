@@ -1,0 +1,60 @@
+.nickname-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nickname-field-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.nickname-field-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 16px; /* 16px 以上，iOS 點欄位時不會自動放大畫面 */
+  transition: border-color 0.15s ease;
+}
+
+.nickname-field-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.nickname-field-input:hover {
+  border-color: var(--color-text-muted);
+}
+
+.nickname-field-input:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  border-color: var(--color-accent);
+}
+
+/* 錯誤狀態：紅框加粗＋下方文字訊息 */
+.nickname-field-input.is-invalid {
+  border-color: var(--color-danger);
+  border-width: 2px;
+}
+
+.nickname-field-hint,
+.nickname-field-error {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.nickname-field-hint {
+  color: var(--color-text-muted);
+}
+
+.nickname-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--color-danger);
+  font-weight: 600;
+}

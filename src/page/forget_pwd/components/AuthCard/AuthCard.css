@@ -1,0 +1,114 @@
+/* ---------- 版面（Mobile-first） ---------- */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+/* ---------- 卡片 ---------- */
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.auth-card-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-card-title {
+  color: var(--color-text);
+  font-size: 24px;
+  font-weight: 800; /* reset.css 會清掉 h1 的粗體，這裡補回來 */
+  line-height: 1.3;
+}
+
+.auth-card-description {
+  color: var(--color-text-muted);
+  font-size: 15px;
+}
+
+/* ---------- 表單 ---------- */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* 檢查連結中等狀態訊息 */
+.auth-card-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-info);
+  font-size: 14px;
+}
+
+.auth-card-status::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-info);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: auth-spin 0.8s linear infinite;
+}
+
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- 斷點 ---------- */
+
+/* 640px 以上：卡片內距加大，和頁首拉開距離 */
+@media (min-width: 640px) {
+  .auth-main {
+    padding: 48px 24px 64px;
+  }
+
+  .auth-card {
+    padding: 32px 28px;
+  }
+
+  .auth-card-title {
+    font-size: 28px;
+  }
+}
+
+/* 1024px 以上：桌機 */
+@media (min-width: 1024px) {
+  .auth-main {
+    max-width: 520px;
+    padding-top: 72px;
+  }
+
+  .auth-card {
+    padding: 36px 32px;
+  }
+}
