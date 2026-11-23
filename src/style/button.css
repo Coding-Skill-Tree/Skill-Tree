@@ -1,0 +1,134 @@
+/* ==========================================================
+   共用按鈕樣式
+   依《Skill Tree｜團隊共用開發規範 v1》第 7 節：
+   - 顏色只用 variables.css 的共用變數
+   - 觸控高度至少 44px
+   - focus 外框沿用 App.css（黃色 --color-accent）
+   - 停用狀態不只靠顏色（改虛線框＋禁止游標）
+   - 支援減少動態效果
+
+   用法：基本 class 一定要加 .btn，再搭配一個樣式和需要的尺寸
+     <button className="btn btn-primary">開始冒險</button>
+     <a className="btn btn-secondary" href="/login">登入</a>
+     <button className="btn btn-danger btn-small">停權</button>
+     <button className="btn btn-primary btn-large btn-block">送出</button>
+
+   樣式：btn-primary（主要）、btn-secondary（外框）、btn-ghost（文字）、btn-danger（危險）
+   尺寸：btn-small（44px）、預設（44px）、btn-large（48px）、btn-block（滿版寬）
+   引入順序：variables.css → App.css → button.css
+   ========================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 20px;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    filter 0.15s ease,
+    background-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.btn:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+/* ---------- 樣式 ---------- */
+
+/* 主要：一個畫面通常只放一個 */
+.btn-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-bg);
+}
+
+.btn-primary:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
+/* 次要：外框 */
+.btn-secondary {
+  background: transparent;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.btn-secondary:not(:disabled):hover {
+  background: var(--color-surface-raised);
+}
+
+/* 文字按鈕：不搶主要動作，例如「取消」 */
+.btn-ghost {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-ghost:not(:disabled):hover {
+  background: var(--color-surface-raised);
+}
+
+/* 危險：停權、刪除等不可輕易復原的動作 */
+.btn-danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-bg);
+}
+
+.btn-danger:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
+/* ---------- 尺寸 ---------- */
+
+/* 小按鈕：字小一點，但高度仍維持 44px */
+.btn-small {
+  padding: 6px 14px;
+  font-size: 14px;
+}
+
+.btn-large {
+  min-height: 48px;
+  padding: 10px 28px;
+  font-size: 17px;
+}
+
+.btn-block {
+  display: flex;
+  width: 100%;
+}
+
+/* ---------- 停用 ----------
+   換成灰底＋虛線框＋禁止游標，不只靠顏色；
+   建議旁邊再加一行文字說明為什麼不能按 */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  background: var(--color-surface-raised);
+  border-style: dashed;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  filter: none;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+
+  .btn:not(:disabled):active {
+    transform: none;
+  }
+}

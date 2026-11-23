@@ -1,0 +1,29 @@
+/* 個人檔案頁的補充樣式。
+   box-sizing、body 背景與字型、按鈕與連結的 focus 外框等基礎設定，
+   來自共用的 src/style/reset.css、variables.css、App.css；按鈕來自 src/style/button.css。
+   這裡只放共用檔沒有的部分。 */
+
+/* 文字連結：底線＋顏色，不只靠顏色；高度 44px 方便點擊 */
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.text-link:hover {
+  color: var(--color-text);
+}
+
+/* 尊重減少動態效果的設定 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

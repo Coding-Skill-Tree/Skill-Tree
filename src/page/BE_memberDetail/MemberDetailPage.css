@@ -1,0 +1,52 @@
+/* 會員詳情頁（版面共用 BE_member/shared/admin-base.css） */
+
+.member-detail-main {
+  max-width: 880px;
+}
+
+.member-detail-back {
+  align-self: flex-start;
+  gap: 6px;
+}
+
+.member-detail-empty {
+  padding: 32px 16px;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  text-align: center;
+}
+
+/* 停權／恢復按鈕：手機滿版，640px 以上靠右 */
+.member-detail-actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.member-detail-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 確認視窗：手機時「確定」在上、「取消」在下，都滿版 */
+.member-detail-dialog-actions {
+  flex-direction: column-reverse;
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .member-detail-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .member-detail-dialog-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}

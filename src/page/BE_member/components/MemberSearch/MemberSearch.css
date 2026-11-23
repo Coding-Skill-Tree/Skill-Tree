@@ -1,0 +1,54 @@
+.member-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.member-search-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 輸入框、放大鏡按鈕、清除按鈕排在同一行（手機也是） */
+.member-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.member-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 16px; /* 16px 以上，iOS 點欄位時不會自動放大畫面 */
+}
+
+.member-search-input:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.member-search-row .btn {
+  flex: 0 0 auto;
+}
+
+/* 放大鏡按鈕：正方形，和輸入框同高 */
+.member-search-submit {
+  width: 44px;
+  padding: 0;
+}
+
+.member-search-icon {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+}
+
+@media (min-width: 1024px) {
+  .member-search {
+    max-width: 640px;
+  }
+}

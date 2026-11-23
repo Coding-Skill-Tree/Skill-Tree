@@ -1,0 +1,54 @@
+/* 三欄：上一頁｜頁碼｜下一頁。左右兩欄等寬，所以按鈕不顯示時頁碼仍在正中間 */
+.pagination {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.pagination-slot {
+  display: flex;
+}
+
+.pagination-slot-prev {
+  justify-content: flex-start;
+}
+
+.pagination-slot-next {
+  justify-content: flex-end;
+}
+
+/* 箭頭按鈕：44×44 正方形 */
+.pagination-button {
+  width: 44px;
+  padding: 0;
+}
+
+.pagination-icon {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+}
+
+.pagination-position {
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 640px 以上：按鈕靠近頁碼 */
+@media (min-width: 640px) {
+  .pagination {
+    gap: 20px;
+  }
+
+  .pagination-slot-prev {
+    justify-content: flex-end;
+  }
+
+  .pagination-slot-next {
+    justify-content: flex-start;
+  }
+}

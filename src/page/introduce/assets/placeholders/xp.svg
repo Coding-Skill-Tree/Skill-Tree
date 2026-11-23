@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" font-family="Noto Sans TC, Microsoft JhengHei, sans-serif">
+  <!-- XP 經驗值示意：閃電圖示＋過關獲得的 XP，參考設計稿上方的「總獲得經驗」統計 -->
+  <rect width="320" height="180" fill="#171C16"/>
+  <circle cx="92" cy="90" r="46" fill="#C6F36A" opacity="0.08"/>
+  <circle cx="92" cy="90" r="34" fill="#1E251C" stroke="#C6F36A" stroke-width="2.5"/>
+  <path d="M98 64 78 94h13l-5 24 22-32H95z" fill="#C6F36A"/>
+  <!-- 這一關獲得的 XP -->
+  <text x="152" y="80" fill="#EBCB72" font-size="30" font-weight="800">+50 XP</text>
+  <text x="152" y="102" fill="#A6AE9D" font-size="11">通過「標籤結構」</text>
+  <!-- 總經驗 -->
+  <rect x="152" y="116" width="140" height="34" rx="8" fill="#1E251C" stroke="#30392C"/>
+  <path d="M166 124l-6 9h4l-2 8 7-10h-4z" fill="#C6F36A"/>
+  <text x="178" y="137" fill="#F2F4ED" font-size="12" font-weight="800">1,250 XP</text>
+  <text x="238" y="137" fill="#A6AE9D" font-size="9">總獲得經驗</text>
+  <!-- 小星星 -->
+  <path d="M132 50l2 5 5 .5-4 3.5 1.2 5-4.2-2.7-4.2 2.7 1.2-5-4-3.5 5-.5z" fill="#EBCB72"/>
+  <path d="M46 132l1.5 3.5 3.5.4-2.7 2.4.8 3.6-3.1-1.9-3.1 1.9.8-3.6-2.7-2.4 3.5-.4z" fill="#EBCB72" opacity="0.7"/>
+</svg>

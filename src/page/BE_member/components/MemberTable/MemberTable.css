@@ -1,0 +1,129 @@
+/* ---------- 手機與平板直向以下（< 768px）：卡片 ---------- */
+.member-table {
+  display: block;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.member-table thead {
+  /* 卡片模式不顯示表頭，改用每格的 data-label */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.member-table tbody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.member-table tr {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.member-table td {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  font-size: 15px;
+}
+
+/* 內容（暱稱連結、狀態標籤）只佔自己的寬度，不要被拉滿 */
+.member-table td > * {
+  justify-self: start;
+}
+
+.member-table td::before {
+  content: attr(data-label);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.member-table-email {
+  overflow-wrap: anywhere;
+}
+
+/* 暱稱連結：底線＋顏色，44px 高方便點擊 */
+.member-table-name {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-primary);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.member-table-name:hover {
+  color: var(--color-text);
+}
+
+/* ---------- 768px 以上：表格 ---------- */
+@media (min-width: 768px) {
+  .member-table {
+    display: table;
+  }
+
+  .member-table thead {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+  }
+
+  .member-table tbody {
+    display: table-row-group;
+  }
+
+  .member-table tr {
+    display: table-row;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .member-table th,
+  .member-table td {
+    display: table-cell;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .member-table td::before {
+    content: none;
+  }
+
+  .member-table th {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* 狀態欄只要標籤的寬度，其餘留給暱稱和 Email */
+  .member-table th:last-child,
+  .member-table td:last-child {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  .member-table tbody tr:hover {
+    background: var(--color-surface-raised);
+  }
+}
