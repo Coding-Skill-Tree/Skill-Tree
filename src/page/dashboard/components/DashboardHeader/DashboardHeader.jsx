@@ -19,9 +19,9 @@ const DashboardHeader = ({
     >
       <Menu aria-hidden="true" />
     </button>
-    <div>
+    <div className="dashboard-header-title">
       <h3 className="dashboard-title">學習儀錶板</h3>
-      <p className="dashboard-sub-title">把今天的練習，變成明天的能力。</p>
+      {/* <p className="dashboard-sub-title">把今天的練習，變成明天的能力。</p> */}
     </div>
     <div className="dashboard-header-actions">
       <div className="header-action" aria-label="通知">
