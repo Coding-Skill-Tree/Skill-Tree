@@ -3,9 +3,7 @@ import { pool } from '../db/pool.js';
 import { requireMember } from '../middleware/require-member.js';
 
 export const progressRouter = Router();
-progressRouter.use(requireMember);
-
-progressRouter.get('/progress', async (request, response, next) => {
+progressRouter.get('/progress', requireMember, async (request, response, next) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
