@@ -1,0 +1,11 @@
+.home nav {
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+}
+
+.navList {
+  display: block;
+  color: var(--color-text);
+  text-decoration: none;
+}
