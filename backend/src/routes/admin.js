@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import { pool } from '../db/pool.js';
 import { requireAdmin } from '../middleware/require-admin.js';
-import { HttpError } from '../lib/http-error.js';
+import { HttpError, validationError } from '../lib/http-error.js';
+import { sendSuccess } from '../lib/api-response.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { validateLogin } from '../lib/validation.js';
 import { assertLoginNotBlocked, clearLoginFailures, hashRateLimitSubject, recordLoginFailure } from '../services/auth-rate-limit.js';
@@ -36,14 +37,14 @@ adminRouter.post('/auth/login', async (request, response, next) => {
 
     await clearLoginFailures('admin_login', subjectHash);
     await createAdminSession(admin.id, response);
-    response.json({ success: true, data: { id: String(admin.id), adminId: String(admin.id), username: admin.username } });
+    sendSuccess(response, { id: String(admin.id), adminId: String(admin.id), username: admin.username });
   } catch (error) {
     next(error);
   }
 });
 
 adminRouter.get('/me', requireAdmin, (request, response) => {
-  response.json({ success: true, data: { id: String(request.admin.id), adminId: String(request.admin.id), username: request.admin.username } });
+  sendSuccess(response, { id: String(request.admin.id), adminId: String(request.admin.id), username: request.admin.username });
 });
 
 adminRouter.post('/auth/logout', async (request, response, next) => {
@@ -77,16 +78,16 @@ function parseMemberId(value) {
 
 function parseMembersQuery(query) {
   if (query.keyword !== undefined && typeof query.keyword !== 'string') {
-    throw new HttpError(400, 'VALIDATION_ERROR', '表單內容有誤', { fields: { keyword: '關鍵字格式錯誤' } });
+    throw validationError({ keyword: '關鍵字格式錯誤' });
   }
   const rawKeyword = typeof query.keyword === 'string' ? query.keyword.trim() : '';
   if (Array.from(rawKeyword).length > 100) {
-    throw new HttpError(400, 'VALIDATION_ERROR', '表單內容有誤', { fields: { keyword: '關鍵字最多 100 個字' } });
+    throw validationError({ keyword: '關鍵字最多 100 個字' });
   }
 
   const rawPage = query.page === undefined ? '1' : String(query.page);
   if (!/^\d+$/u.test(rawPage) || !Number.isSafeInteger(Number(rawPage)) || Number(rawPage) < 1) {
-    throw new HttpError(400, 'VALIDATION_ERROR', '表單內容有誤', { fields: { page: '頁碼必須是正整數' } });
+    throw validationError({ page: '頁碼必須是正整數' });
   }
   return { keyword: rawKeyword, page: Number(rawPage) };
 }
@@ -175,7 +176,7 @@ adminRouter.get('/members', async (request, response, next) => {
       [keyword, MEMBERS_PAGE_SIZE, offset.toString()],
     );
     await client.query('COMMIT');
-    response.json({ success: true, data: {
+    sendSuccess(response, {
       items: memberResult.rows.map((member) => ({
         id: member.id,
         userId: member.id,
@@ -190,7 +191,7 @@ adminRouter.get('/members', async (request, response, next) => {
       pageSize: MEMBERS_PAGE_SIZE,
       total,
       totalPages,
-    } });
+    });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     next(error);
@@ -202,7 +203,7 @@ adminRouter.get('/members', async (request, response, next) => {
 adminRouter.get('/members/:id', async (request, response, next) => {
   try {
     const member = await readMemberDetails(pool, parseMemberId(request.params.id));
-    response.json({ success: true, data: member });
+    sendSuccess(response, member);
   } catch (error) {
     next(error);
   }
@@ -236,7 +237,7 @@ async function setMemberSuspension(request, response, next, suspend) {
 
     const member = await readMemberDetails(client, memberId);
     await client.query('COMMIT');
-    response.json({ success: true, data: member });
+    sendSuccess(response, member);
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     next(error);

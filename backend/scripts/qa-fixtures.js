@@ -31,7 +31,9 @@ if (!/^[^@\s]+@[^@\s]+\.test$/u.test(email)) {
     const skillResult = await client.query('SELECT catalog_version AS version FROM skills WHERE id = $1 AND active = true', [skillId]);
     if (!skillResult.rowCount) throw new Error('The html-basics development skill is missing; run db:seed first.');
     const questionResult = await client.query(
-      `SELECT id, prompt, choices, correct_choice AS "correctChoice", explanation
+      `SELECT id, prompt, choices, answer_mode AS "answerMode",
+              correct_choices AS "correctChoices", choice_explanations AS "choiceExplanations",
+              correct_choice AS "correctChoice", explanation
        FROM questions
        WHERE skill_id = $1 AND active = true AND is_demo = true
        ORDER BY id
@@ -70,21 +72,31 @@ if (!/^[^@\s]+@[^@\s]+\.test$/u.test(email)) {
     for (let index = 0; index < questionResult.rows.length; index += 1) {
       const question = questionResult.rows[index];
       const ordinal = index + 1;
-      const selectedChoice = ordinal === 5 ? (question.correctChoice + 1) % 3 : question.correctChoice;
+      const selectedChoices = ordinal === 5
+        ? [(question.correctChoices[0] + 1) % question.choices.length]
+        : question.correctChoices;
+      const selectedChoice = selectedChoices[0] ?? null;
       await client.query(
         `INSERT INTO quiz_attempt_questions
           (attempt_id, question_id, ordinal, prompt_snapshot, choices_snapshot,
-           correct_choice_snapshot, explanation_snapshot, selected_choice, answered_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+           correct_choice_snapshot, answer_mode_snapshot, correct_choices_snapshot,
+           choice_explanations_snapshot, explanation_snapshot, selected_choice, selected_choices, answered_at)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12::jsonb, now())
          ON CONFLICT (attempt_id, ordinal) DO UPDATE SET
            question_id = EXCLUDED.question_id,
            prompt_snapshot = EXCLUDED.prompt_snapshot,
            choices_snapshot = EXCLUDED.choices_snapshot,
            correct_choice_snapshot = EXCLUDED.correct_choice_snapshot,
+           answer_mode_snapshot = EXCLUDED.answer_mode_snapshot,
+           correct_choices_snapshot = EXCLUDED.correct_choices_snapshot,
+           choice_explanations_snapshot = EXCLUDED.choice_explanations_snapshot,
            explanation_snapshot = EXCLUDED.explanation_snapshot,
            selected_choice = EXCLUDED.selected_choice,
+           selected_choices = EXCLUDED.selected_choices,
            answered_at = EXCLUDED.answered_at`,
-        [attemptId, question.id, ordinal, question.prompt, JSON.stringify(question.choices), question.correctChoice, question.explanation, selectedChoice],
+        [attemptId, question.id, ordinal, question.prompt, JSON.stringify(question.choices), question.correctChoice,
+          question.answerMode, JSON.stringify(question.correctChoices), JSON.stringify(question.choiceExplanations),
+          question.explanation, selectedChoice, JSON.stringify(selectedChoices)],
       );
     }
 

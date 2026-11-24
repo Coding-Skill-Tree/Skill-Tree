@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import { pool } from '../db/pool.js';
 import { requireMember } from '../middleware/require-member.js';
-import { HttpError } from '../lib/http-error.js';
+import { HttpError, validationError } from '../lib/http-error.js';
+import { sendSuccess } from '../lib/api-response.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { isValidEmail, normalizeEmail, validateLogin, validateNewPassword, validateRegistration } from '../lib/validation.js';
 import { assertLoginNotBlocked, clearLoginFailures, hashRateLimitSubject, recordLoginFailure } from '../services/auth-rate-limit.js';
@@ -75,7 +76,7 @@ authRouter.post('/auth/register', async (request, response, next) => {
         message: error.message,
       });
     }
-    response.status(201).json({ success: true, data: { email } });
+    sendSuccess(response, { email }, 201);
   } catch (error) {
     next(error);
   }
@@ -102,7 +103,7 @@ authRouter.post('/auth/verify-email', async (request, response, next) => {
     await client.query('UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()), updated_at = now() WHERE id = $1', [verification.user_id]);
     await client.query('UPDATE email_tokens SET used_at = now() WHERE id = $1', [verification.id]);
     await client.query('COMMIT');
-    response.json({ success: true, data: { emailVerified: true } });
+    sendSuccess(response, { emailVerified: true });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     next(error);
@@ -145,7 +146,7 @@ authRouter.post('/auth/login', async (request, response, next) => {
 
     await clearLoginFailures('member_login', subjectHash);
     await createMemberSession(member.id, response);
-    response.json({ success: true, data: memberPayload(member) });
+    sendSuccess(response, memberPayload(member));
   } catch (error) {
     next(error);
   }
@@ -155,7 +156,7 @@ authRouter.post('/auth/forgot-password', async (request, response, next) => {
   const email = normalizeEmail(request.body?.email);
   const genericMessage = '若此 Email 已註冊，我們已寄出重設密碼的連結';
   if (!isValidEmail(email)) {
-    return next(new HttpError(400, 'VALIDATION_ERROR', '表單內容有誤', { fields: { email: '請輸入有效的 Email' } }));
+    return next(validationError({ email: '請輸入有效的 Email' }));
   }
 
   try {
@@ -208,7 +209,7 @@ authRouter.post('/auth/forgot-password', async (request, response, next) => {
         }
       }
     }
-    response.json({ success: true, data: { message: genericMessage } });
+    sendSuccess(response, { message: genericMessage });
   } catch (error) {
     next(error);
   }
@@ -280,9 +281,7 @@ authRouter.post('/auth/change-password', requireMember, async (request, response
           throw new HttpError(400, 'CURRENT_PASSWORD_INCORRECT', '目前密碼不正確');
         }
         if (await verifyPassword(newPassword, currentHash)) {
-          throw new HttpError(400, 'VALIDATION_ERROR', '表單內容有誤', {
-            fields: { newPassword: '新密碼不可與目前密碼相同' },
-          });
+          throw validationError({ newPassword: '新密碼不可與目前密碼相同' });
         }
       }
 
@@ -306,7 +305,7 @@ authRouter.post('/auth/change-password', requireMember, async (request, response
 });
 
 authRouter.get('/me', requireMember, (request, response) => {
-  response.json({ success: true, data: memberPayload(request.member) });
+  sendSuccess(response, memberPayload(request.member));
 });
 
 authRouter.post('/auth/logout', async (request, response, next) => {

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { requireMember } from '../middleware/require-member.js';
+import { sendSuccess } from '../lib/api-response.js';
 
 export const progressRouter = Router();
 progressRouter.get('/progress', requireMember, async (request, response, next) => {
@@ -19,11 +20,11 @@ progressRouter.get('/progress', requireMember, async (request, response, next) =
       'SELECT COALESCE(MAX(catalog_version), 1)::int AS version FROM skills WHERE active = true',
     );
     await client.query('COMMIT');
-    response.json({ success: true, data: {
+    sendSuccess(response, {
       catalogVersion: catalogResult.rows[0].version,
       revision: revisionResult.rows[0]?.revision ?? '0',
       completedSkillIds: completionResult.rows.map((row) => row.skillId),
-    } });
+    });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     next(error);

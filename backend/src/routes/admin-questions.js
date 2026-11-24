@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { requireAdmin } from '../middleware/require-admin.js';
-import { HttpError } from '../lib/http-error.js';
+import { HttpError, validationError } from '../lib/http-error.js';
+import { sendSuccess } from '../lib/api-response.js';
 
 export const adminQuestionsRouter = Router();
 adminQuestionsRouter.use(requireAdmin);
@@ -9,6 +10,8 @@ adminQuestionsRouter.use(requireAdmin);
 const MAX_BIGINT = 9223372036854775807n;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const MIN_CHOICES = 2;
+const MAX_CHOICES = 10;
 const DIFFICULTIES = new Set(['beginner', 'intermediate', 'advanced']);
 const STATUSES = new Set(['draft', 'published']);
 const difficultyAliases = new Map([
@@ -18,10 +21,6 @@ const difficultyAliases = new Map([
 const statusAliases = new Map([
   ['草稿', 'draft'], ['已發布', 'published'], ['draft', 'draft'], ['published', 'published'],
 ]);
-
-function validationError(fields) {
-  return new HttpError(400, 'VALIDATION_ERROR', '表單內容有誤', { fields });
-}
 
 function questionNotFound() {
   return new HttpError(404, 'QUESTION_NOT_FOUND', '找不到這道題目');
@@ -69,20 +68,39 @@ function parseQuestionBody(body) {
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
   const explanation = typeof body?.explanation === 'string' ? body.explanation.trim() : '';
   const choices = Array.isArray(body?.choices) ? body.choices.map((choice) => typeof choice === 'string' ? choice.trim() : '') : [];
-  const correctChoice = body?.correctChoice;
+  const choiceExplanations = Array.isArray(body?.choiceExplanations)
+    ? body.choiceExplanations.map((value) => typeof value === 'string' ? value.trim() : '')
+    : [];
+  const hasCorrectChoices = body?.correctChoices !== undefined;
+  const correctChoices = Array.isArray(body?.correctChoices)
+    ? body.correctChoices
+    : Number.isInteger(body?.correctChoice) ? [body.correctChoice] : [];
+  const answerMode = body?.answerMode === undefined ? (correctChoices.length > 1 ? 'multiple' : 'single') : body.answerMode;
   const difficulty = difficultyAliases.get(typeof body?.difficulty === 'string' ? body.difficulty.trim() : '') || '';
   const status = statusAliases.get(typeof body?.status === 'string' ? body.status.trim() : '') || '';
 
   if (!skillId || skillId.length > 80) fields.skillId = '請選擇有效的技能節點';
   if (!prompt || Array.from(prompt).length > 500) fields.prompt = '題目敘述必填，最多 500 個字';
-  if (choices.length !== 3 || choices.some((choice) => !choice || Array.from(choice).length > 180)) fields.choices = '請填寫三個選項，每個選項最多 180 個字';
-  if (!Number.isInteger(correctChoice) || correctChoice < 0 || correctChoice > 2) fields.correctChoice = '請選擇正確答案';
+  if (choices.length < MIN_CHOICES || choices.length > MAX_CHOICES || choices.some((choice) => !choice || Array.from(choice).length > 180)) {
+    fields.choices = `請填寫 ${MIN_CHOICES} 到 ${MAX_CHOICES} 個選項，每個選項最多 180 個字`;
+  }
+  if (choiceExplanations.length !== choices.length || choiceExplanations.some((value) => !value || Array.from(value).length > 1200)) {
+    fields.choiceExplanations = '請為每個選項填寫解析，每則最多 1200 個字';
+  }
+  if (!['single', 'multiple'].includes(answerMode)) fields.answerMode = '請選擇單選或多選';
+  if ((hasCorrectChoices && !Array.isArray(body.correctChoices))
+      || correctChoices.some((index) => !Number.isInteger(index) || index < 0 || index >= choices.length)
+      || new Set(correctChoices).size !== correctChoices.length
+      || (answerMode === 'single' && correctChoices.length !== 1)
+      || (answerMode === 'multiple' && correctChoices.length < 2)) {
+    fields.correctChoices = answerMode === 'multiple' ? '多選題至少要標記兩個正確選項' : '單選題請標記一個正確選項';
+  }
   if (!explanation || Array.from(explanation).length > 1200) fields.explanation = '答案解析必填，最多 1200 個字';
   if (!difficulty || !DIFFICULTIES.has(difficulty)) fields.difficulty = '請選擇有效的題目難度';
   if (!status || !STATUSES.has(status)) fields.status = '請選擇有效的題目狀態';
   if (Object.keys(fields).length) throw validationError(fields);
 
-  return { skillId, prompt, choices, correctChoice, explanation, difficulty, status };
+  return { skillId, prompt, choices, choiceExplanations, answerMode, correctChoices, explanation, difficulty, status };
 }
 
 function toQuestion(row) {
@@ -94,7 +112,10 @@ function toQuestion(row) {
     category: row.category,
     prompt: row.prompt,
     choices: row.choices,
-    correctChoice: row.correctChoice,
+    answerMode: row.answerMode,
+    correctChoices: row.correctChoices,
+    choiceExplanations: row.choiceExplanations,
+    correctChoice: row.answerMode === 'single' ? row.correctChoice : null,
     explanation: row.explanation,
     difficulty: row.difficulty,
     status: row.status,
@@ -107,7 +128,9 @@ async function readQuestion(database, questionId) {
   const result = await database.query(
     `SELECT q.id::text AS id, q.skill_id AS "skillId", s.title AS "skillTitle",
             c.id AS "categoryId", c.name AS category, q.prompt, q.choices,
-            q.correct_choice AS "correctChoice", q.explanation, q.difficulty, q.status,
+            q.correct_choice AS "correctChoice", q.answer_mode AS "answerMode",
+            q.correct_choices AS "correctChoices", q.choice_explanations AS "choiceExplanations",
+            q.explanation, q.difficulty, q.status,
             q.created_at AS "createdAt", q.updated_at AS "updatedAt"
      FROM questions q
      JOIN skills s ON s.id = q.skill_id
@@ -167,13 +190,10 @@ adminQuestionsRouter.get('/summary', async (_request, response, next) => {
       ),
     ]);
 
-    response.json({
-      success: true,
-      data: {
+    sendSuccess(response, {
         ...totals.rows[0],
         categories: categories.rows,
         recent: recent.rows.map((row) => ({ ...row, updatedAt: new Date(row.updatedAt).toISOString() })),
-      },
     });
   } catch (error) {
     next(error);
@@ -197,10 +217,10 @@ adminQuestionsRouter.get('/options', async (_request, response, next) => {
         categories.set(row.categoryId, { id: row.categoryId, name: row.category });
       }
       if (row.skillId) {
-        skills.push({ id: row.skillId, title: row.skillTitle, categoryId: row.categoryId, category: row.category });
+        skills.push({ id: row.skillId, skillId: row.skillId, title: row.skillTitle, categoryId: row.categoryId, category: row.category });
       }
     }
-    response.json({ success: true, data: { categories: [...categories.values()], skills } });
+    sendSuccess(response, { categories: [...categories.values()], skills });
   } catch (error) {
     next(error);
   }
@@ -236,7 +256,7 @@ adminQuestionsRouter.get('/', async (request, response, next) => {
       [keyword, categoryId, status, pageSize, offset.toString()],
     );
     await client.query('COMMIT');
-    response.json({ success: true, data: {
+    sendSuccess(response, {
       items: itemsResult.rows.map((row) => ({
         ...row,
         updatedAt: new Date(row.updatedAt).toISOString(),
@@ -245,7 +265,7 @@ adminQuestionsRouter.get('/', async (request, response, next) => {
       pageSize,
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
-    } });
+    });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     next(error);
@@ -257,7 +277,7 @@ adminQuestionsRouter.get('/', async (request, response, next) => {
 adminQuestionsRouter.get('/:id', async (request, response, next) => {
   try {
     const question = await readQuestion(pool, parseQuestionId(request.params.id));
-    response.json({ success: true, data: question });
+    sendSuccess(response, question);
   } catch (error) {
     next(error);
   }
@@ -270,17 +290,19 @@ adminQuestionsRouter.post('/', async (request, response, next) => {
     await client.query('BEGIN');
     await assertActiveSkill(client, question.skillId);
     const inserted = await client.query(
-      `INSERT INTO questions(skill_id, prompt, choices, correct_choice, explanation, active, is_demo, difficulty, status)
-       VALUES ($1, $2, $3::jsonb, $4, $5, $6, false, $7, $8)
+      `INSERT INTO questions(skill_id, prompt, choices, correct_choice, answer_mode,
+                             correct_choices, choice_explanations, explanation, active, is_demo, difficulty, status)
+       VALUES ($1, $2, $3::jsonb, $4, $5, $6::jsonb, $7::jsonb, $8, $9, false, $10, $11)
        RETURNING id::text AS id`,
-      [question.skillId, question.prompt, JSON.stringify(question.choices), question.correctChoice,
+      [question.skillId, question.prompt, JSON.stringify(question.choices), question.correctChoices[0],
+        question.answerMode, JSON.stringify(question.correctChoices), JSON.stringify(question.choiceExplanations),
         question.explanation, question.status === 'published', question.difficulty, question.status],
     );
     const questionId = inserted.rows[0].id;
     await auditQuestion(client, request.admin.id, 'question.create', questionId, { status: question.status });
     const created = await readQuestion(client, questionId);
     await client.query('COMMIT');
-    response.status(201).json({ success: true, data: created });
+    sendSuccess(response, created, 201);
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     next(error.code === '23505' ? questionConflict() : error);
@@ -304,15 +326,17 @@ adminQuestionsRouter.put('/:id', async (request, response, next) => {
     await client.query(
       `UPDATE questions
        SET skill_id = $1, prompt = $2, choices = $3::jsonb, correct_choice = $4,
-           explanation = $5, active = $6, difficulty = $7, status = $8, updated_at = now()
-       WHERE id = $9`,
-      [question.skillId, question.prompt, JSON.stringify(question.choices), question.correctChoice,
+           answer_mode = $5, correct_choices = $6::jsonb, choice_explanations = $7::jsonb,
+           explanation = $8, active = $9, difficulty = $10, status = $11, updated_at = now()
+       WHERE id = $12`,
+      [question.skillId, question.prompt, JSON.stringify(question.choices), question.correctChoices[0],
+        question.answerMode, JSON.stringify(question.correctChoices), JSON.stringify(question.choiceExplanations),
         question.explanation, question.status === 'published', question.difficulty, question.status, questionId],
     );
     await auditQuestion(client, request.admin.id, 'question.update', questionId, { status: question.status });
     const updated = await readQuestion(client, questionId);
     await client.query('COMMIT');
-    response.json({ success: true, data: updated });
+    sendSuccess(response, updated);
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     next(error.code === '23505' ? questionConflict() : error);

@@ -40,8 +40,8 @@ Vite 將 `/api` 代理至 `http://127.0.0.1:3000`。前端和後端需同時執�
 
 - E01 顯示資料庫中的題目總數、已發布／草稿數、分類分布和最近新增題目。
 - E02 題庫列表支援伺服器端搜尋、分類／狀態篩選、分頁和軟刪除。
-- E03 新增／編輯表單會載入資料庫中的技能節點並儲存題目、三個選項、正確答案、解析、難度與狀態。
-- E04 題目詳情由資料庫載入，顯示技能分類、正解、解析及建立／更新時間。
+- E03 新增／編輯表單會載入資料庫中的技能節點並儲存題目、2 到 10 個選項、每個選項的解析、單選／多選答案、整題解析、難度與狀態。
+- E04 題目詳情由資料庫載入，顯示作答方式、所有正解、每個選項的解析、整題解析及建立／更新時間。
 - 管理畫面使用獨立管理員 session；未登入時需先登入，資料庫與 API 尚未啟動時會顯示連線提示。
 - 深色表面、青檸綠主色、共用 tokens、1440px 內容寬度與 1279／940／639px 版面斷點延續目前主線 dashboard。後台操作按鈕維持至少 44px 觸控高度。
 
@@ -52,10 +52,47 @@ Vite 將 `/api` 代理至 `http://127.0.0.1:3000`。前端和後端需同時執�
 - `/api/admin/auth/login`、`GET /api/admin/me`、`POST /api/admin/auth/logout`：獨立管理員 session。
 - `/api/admin/questions`：管理員題庫查詢、新增、編輯、軟刪除、分類／技能選項與總覽摘要。
 - `/api/admin/members`、`/api/admin/members/:id`：A09 會員搜尋與分頁、A10 會員詳情；詳情提供角色、Google 綁定、XP、等級、學習進度及停權／恢復操作。
+- `GET /api/skills`：公開唯讀技能目錄，提供分類、技能節點、學習項目、位置、先修關係與 `catalogVersion`。
 - `GET /api/progress`：登入會員讀取 `catalogVersion`、`revision`、`completedSkillIds`。
 
 成功回應使用 `{ "success": true, "data": ... }`，錯誤使用 `{ "success": false, "error": { "code", "message", "requestId", "details" } }`。BIGINT ID 以字串傳送，時間使用 UTC ISO 8601。管理員會員 API 對齊 A 組第一階段假 API 欄位；角色和等級存於會員資料，等級公式仍待小組確認；Google 綁定資料由 `member_auth_identities` 保存，但 OAuth 串接尚未實作。XP 與分類進度分別讀取帳本和完成紀錄。前端共用 API client 在 `src/services/api.js`；管理員登入和題庫 adapter 分別在 `src/services/adminAuth.js`、`src/services/adminQuestions.js`。
 
-題目使用技能節點 ID 關聯分類，選項固定三個，`correctChoice` 是從 0 開始的索引。資料庫進度表使用 `user_skill_completions`，migration 006 將舊 scaffold 表名 `completed_skills` 遷移至 Issue #1 討論的共用名稱；migration 007 增加會員角色、等級與 Google 綁定資料。等級計算規則和 Google OAuth 流程仍待小組確認，既有 migration 保持不變。
+### 共用回應與錯誤格式（E-06）
+
+- 成功：`{ "success": true, "data": { ... } }`；建立資源回傳 HTTP 201，查詢／更新回傳 HTTP 200。登出和軟刪除等無內容操作回傳 HTTP 204，不帶 JSON body。
+- 錯誤：`{ "success": false, "error": { "code": "VALIDATION_ERROR", "message": "表單內容有誤", "requestId": "...", "details": { "fields": { ... } }, "fields": { ... } } }`。`fields` 只在欄位驗證錯誤時出現。
+- 使用 HTTP 400 表示請求或欄位格式錯誤、401 表示未登入、403 表示權限不足、404 表示資源不存在、409 表示資料衝突；資料庫暫時無法使用時回傳 503。
+- API client 應先檢查 `success`，再讀取 `data`；錯誤時使用 `error.code`、`error.message` 和可選的 `error.fields` 顯示對應訊息。
+
+### 題庫資料契約（E-05）
+
+題目使用技能節點 ID 關聯分類。`choices` 是 2 到 10 個字串；`choiceExplanations` 依相同索引保存每個選項的解析；`answerMode` 為 `single` 或 `multiple`；`correctChoices` 是從 0 起算且不重複的正確選項索引陣列。單選題需一個索引，多選題至少需兩個。`explanation` 保留作為整題補充解析。舊的 `correctChoice` 僅供單選相容，使用多選的模組應讀取 `correctChoices`。
+
+技能目錄的 `GET /api/skills` 回傳 `{ catalogVersion, categories, skills }`。每個技能使用 `skillId` 作為正式識別欄位，並提供 `categoryId`、`learningItems`、`position: { x, y }`、`sortOrder` 和 `prerequisiteSkillIds`。`GET /api/progress` 的完成清單也使用相同的 `skillId` 值；未登入的模組可讀目錄，會員進度需登入。
+
+新增題目請傳送以下格式：
+
+```json
+{
+  "skillId": "html-basics",
+  "prompt": "哪些元素可用來建立表單控制項？",
+  "answerMode": "multiple",
+  "choices": ["input", "label", "main", "button"],
+  "choiceExplanations": [
+    "正確；input 可建立多種表單欄位。",
+    "正確；label 可標示並關聯表單控制項。",
+    "main 用來標示頁面主要內容，不是表單控制項。",
+    "正確；button 可執行表單相關動作。"
+  ],
+  "correctChoices": [0, 1, 3],
+  "explanation": "表單由控制項、標籤和操作按鈕組成。",
+  "difficulty": "beginner",
+  "status": "draft"
+}
+```
+
+管理員題目詳情 API 回傳 `answerMode`、`choices`、`choiceExplanations`、`correctChoices` 和整題 `explanation`。資料庫 migration 008 將這些欄位加到題目與作答快照；快照另保存 `selectedChoices`，讓 C 能保存多選答案。C 負責測驗介面、答案判定、計分方式及結果呈現；E 提供題目資料、持久化欄位與 API 契約。多選題目前不定義部分給分。
+
+資料庫進度表使用 `user_skill_completions`，migration 006 將舊 scaffold 表名 `completed_skills` 遷移至共用名稱；migration 007 增加會員角色、等級與 Google 綁定資料。等級計算規則和 Google OAuth 流程仍待小組確認，既有 migration 保持不變。
 
 C 負責測驗 UI、測驗開始／作答／評分／歷史 API；本次沒有新增這些測驗端點。進度 API 是 E 提供的共用讀取介面。尚未接入正式部署環境、正式 SMTP 或 production 資料庫，請以各組員完成本機 migrations 與 API health 檢查作為環境驗收依據。
