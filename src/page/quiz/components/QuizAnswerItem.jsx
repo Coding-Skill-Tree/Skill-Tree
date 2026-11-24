@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { CheckCircle, XmarkCircle } from "iconoir-react";
 
 function QuizAnswerItem({
   questionNumber,
   questionText,
   userAnswer,
   correctAnswer,
-  explanation,
+  options,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const isCorrect = userAnswer === correctAnswer;
@@ -16,18 +17,40 @@ function QuizAnswerItem({
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
       >
+        {isCorrect ? (
+          <CheckCircle className="quiz-answer-correct-icon" />
+        ) : (
+          <XmarkCircle className="quiz-answer-incorrect-icon" />
+        )}
         <span>第{questionNumber}題</span>
         <span>{questionText}</span>
         <span>{isOpen ? "▲" : "▼"}</span>
       </button>
       {isOpen && (
         <div className="quiz-answer-detail">
-          <p>你的答案：{userAnswer}</p>
-          <p className={isCorrect ? "answer-correct" : "answer-incorrect"}>
-            {isCorrect ? "回答正確" : "回答錯誤"}
-          </p>
-          <p>正確答案：{correctAnswer}</p>
-          <p>答案解析：{explanation}</p>
+          {options.map((option) => (
+            <div key={option.id} className="quiz-answer-option">
+              <div className="quiz-answer-option-header">
+                <span>
+                  {option.id}. {option.text}
+                </span>
+
+                {option.id === correctAnswer ? (
+                  <span className="quiz-option-correct">正確選項</span>
+                ) : (
+                  <span className="quiz-option-incorrect">錯誤選項</span>
+                )}
+              </div>
+
+              {option.id === userAnswer && (
+                <span className="quiz-option-selected">你的答案</span>
+              )}
+
+              <p className="quiz-answer-option-explanation">
+                解析：{option.explanation}
+              </p>
+            </div>
+          ))}
         </div>
       )}
     </div>
