@@ -42,7 +42,7 @@
   line-height: 1.3;
 }
 
-/* 區塊（基本資料、前往） */
+/* 區塊（基本資料） */
 .profile-section {
   display: flex;
   flex-direction: column;
@@ -55,13 +55,10 @@
   font-weight: 700;
 }
 
-/* ---------- 底部：回到技能樹地圖＋登出 ---------- */
+/* ---------- 底部：登出（回到地圖用頁首的「技能樹地圖」） ---------- */
 .profile-actions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-end;
 }
 
 /* ---------- 斷點 ---------- */

@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
-import { DEMO_LINKS, PROFILE_TEXT, ROUTES } from "./data/profileContent.js";
+import { useCallback, useEffect, useState } from "react";
+import { DEMO_LINKS, DEMO_TAKEN_NICKNAMES, PROFILE_TEXT, ROUTES } from "./data/profileContent.js";
 import { getMe, logout } from "./utils/fakeSessionApi.js";
 import SiteHeader from "./components/SiteHeader/SiteHeader.jsx";
 import PageStatus from "./components/PageStatus/PageStatus.jsx";
 import BasicInfo from "./components/BasicInfo/BasicInfo.jsx";
-import GameDataEntry from "./components/GameDataEntry/GameDataEntry.jsx";
-// 示範區塊和忘記密碼頁共用
+// 示範區塊與浮動通知和忘記密碼頁共用
 import DemoHint from "../forget_pwd/components/DemoHint/DemoHint.jsx";
+import FloatingNotice from "../forget_pwd/components/FloatingNotice/FloatingNotice.jsx";
 import "./ProfilePage.css";
 
 // 依登入狀態決定結果：
@@ -28,6 +28,10 @@ function ProfilePage() {
   const [user, setUser] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [notice, setNotice] = useState(null); // { id, text }，同樣文字再出現時換新 id 重新計時
+
+  const showNotice = useCallback((text) => setNotice({ id: Date.now(), text }), []);
+  const clearNotice = useCallback(() => setNotice(null), []);
 
   // 載入登入狀態；attempt 改變（按重試）時再請求一次
   useEffect(() => {
@@ -64,6 +68,7 @@ function ProfilePage() {
 
   return (
     <div className="profile-page">
+      <FloatingNotice notice={notice} onDone={clearNotice} />
       <SiteHeader />
 
       <main className="profile-main">
@@ -72,8 +77,8 @@ function ProfilePage() {
 
           {status === "ready" ? (
             <>
-              <BasicInfo user={user} />
-              <GameDataEntry />
+              {/* 儲存成功後更新登入資料（正式版改成呼叫登入狀態 context 的 setUser，頁首也會跟著更新） */}
+              <BasicInfo user={user} onSaved={setUser} onNotice={showNotice} />
             </>
           ) : (
             <PageStatus state={status} onRetry={handleRetry} />
@@ -82,9 +87,6 @@ function ProfilePage() {
 
         {status === "ready" && (
           <div className="profile-actions">
-            <a className="text-link" href={ROUTES.learn}>
-              {PROFILE_TEXT.backToMap}
-            </a>
             <button
               type="button"
               className="btn btn-secondary btn-small"
@@ -104,6 +106,7 @@ function ProfilePage() {
               </a>
             ))}
           </p>
+          <p>編輯時把暱稱改成 {DEMO_TAKEN_NICKNAMES.join("、")}，儲存會顯示「此暱稱已被使用」。</p>
         </DemoHint>
       </main>
     </div>

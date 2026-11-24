@@ -50,6 +50,44 @@
   image-rendering: pixelated;
 }
 
+/* 區塊標題列：「基本資料」＋編輯按鈕 */
+.basic-info-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+/* ---------- 編輯狀態 ---------- */
+.basic-info-form {
+  gap: 24px;
+}
+
+/* 卡片內較窄（約 640px 寬時每格只剩 72px），角色圖縮到不超出格子 */
+.basic-info-form .avatar-option-image {
+  width: min(64px, 100%);
+  height: auto;
+  aspect-ratio: 1;
+}
+
+/* 編輯時的 Email、加入日期（唯讀），和檢視狀態同樣的排法 */
+.basic-info-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding-top: 20px;
+  border-top: 1px dashed var(--color-border);
+}
+
+/* 取消＋儲存：手機時各佔一半，放大後靠右 */
+.basic-info-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 /* 640px 以上：標籤與內容並排成兩欄 */
 @media (min-width: 640px) {
   .basic-info {
@@ -66,5 +104,20 @@
 
   .basic-info-label {
     font-size: 15px;
+  }
+}
+
+@media (min-width: 640px) {
+  .basic-info-readonly {
+    gap: 14px;
+  }
+
+  .basic-info-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .basic-info-actions .btn {
+    min-width: 120px;
   }
 }
