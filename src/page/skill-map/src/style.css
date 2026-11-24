@@ -1362,3 +1362,86 @@ progress::-moz-progress-bar {
     min-height: 260px;
   }
 }
+
+/* 歷史測驗紀錄按鈕 */
+.history-button {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+
+  background: transparent;
+  border: 1px solid #6e9257;
+  border-radius: 9px;
+
+  color: #b3e77c;
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.history-button:hover {
+  background: #35472f;
+  border-color: #b3e77c;
+}
+
+/* 歷史紀錄視窗樣式 */
+.history-dialog {
+  width: min(900px, calc(100% - 32px));
+  max-height: 85dvh;
+  overflow-y: auto;
+  padding: 24px;
+
+  color: #f0f2f1;
+  background: #1b221b;
+  border: 1px solid #465b38;
+  border-radius: 12px;
+}
+
+.history-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #b3e77c;
+}
+
+.history-header button {
+  cursor: pointer;
+  font-size: 22px;
+}
+
+.history-dialog h2 {
+  margin: 24px 0 12px;
+}
+
+.history-dialog h3 {
+  margin-top: 24px;
+}
+
+.history-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.history-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #506a42;
+  border-radius: 9px;
+}
