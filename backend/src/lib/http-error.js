@@ -7,3 +7,7 @@ export class HttpError extends Error {
     this.details = details;
   }
 }
+
+export function validationError(fields, message = '表單內容有誤') {
+  return new HttpError(400, 'VALIDATION_ERROR', message, { fields });
+}

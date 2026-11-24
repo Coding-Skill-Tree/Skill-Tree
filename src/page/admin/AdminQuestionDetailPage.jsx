@@ -52,7 +52,30 @@ export default function AdminQuestionDetailPage({ admin, onLogout }) {
           <div className="question-detail-main">
             <section className="admin-panel question-detail-card" aria-labelledby="question-prompt-heading"><div className="question-detail-card-heading"><span className="question-detail-icon"><AdminIcon name="book" size={17}/></span><div><span className="panel-kicker">QUESTION</span><h2 id="question-prompt-heading">題目敘述</h2></div></div><p className="question-detail-prompt">{question.prompt}</p></section>
 
-            <section className="admin-panel question-detail-card" aria-labelledby="question-choices-heading"><div className="question-detail-card-heading"><span className="question-detail-icon"><AdminIcon name="check" size={17}/></span><div><span className="panel-kicker">ANSWER OPTIONS</span><h2 id="question-choices-heading">選項與正確答案</h2></div><span className="question-detail-answer-key">正解已標示</span></div><ol className="question-detail-options">{question.choices.map((choice, index) => { const isCorrect = index === question.correctChoice; return <li className={`question-detail-option${isCorrect ? " is-correct" : ""}`} key={`${question.id}-${index}`}><span className="question-detail-option-letter">{String.fromCharCode(65 + index)}</span><span className="question-detail-option-text">{choice}</span>{isCorrect && <span className="question-correct-answer"><AdminIcon name="check" size={14}/>正確答案</span>}</li>; })}</ol></section>
+            <section className="admin-panel question-detail-card" aria-labelledby="question-choices-heading">
+              <div className="question-detail-card-heading">
+                <span className="question-detail-icon"><AdminIcon name="check" size={17}/></span>
+                <div><span className="panel-kicker">ANSWER OPTIONS</span><h2 id="question-choices-heading">選項與正確答案</h2></div>
+                <span className="question-detail-answer-key">{question.answerMode === "multiple" ? `多選 · ${question.correctChoices.length} 個正解` : "單選"}</span>
+              </div>
+              <ol className="question-detail-options">
+                {question.choices.map((choice, index) => {
+                  const isCorrect = question.correctChoices?.includes(index)
+                    || (question.answerMode !== "multiple" && index === question.correctChoice);
+                  const choiceExplanation = question.choiceExplanations?.[index] || "尚未補上選項解析。";
+                  return (
+                    <li className={`question-detail-option${isCorrect ? " is-correct" : ""}`} key={`${question.id}-${index}`}>
+                      <span className="question-detail-option-letter">{String.fromCharCode(65 + index)}</span>
+                      <div className="question-detail-option-content">
+                        <span className="question-detail-option-text">{choice}</span>
+                        <p className="question-detail-option-explanation">{choiceExplanation}</p>
+                      </div>
+                      {isCorrect && <span className="question-correct-answer"><AdminIcon name="check" size={14}/>正確答案</span>}
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
 
             <section className="admin-panel question-explanation-card" aria-labelledby="question-explanation-heading"><div className="question-detail-card-heading"><span className="question-explanation-icon"><AdminIcon name="check" size={17}/></span><div><span className="panel-kicker">EXPLANATION</span><h2 id="question-explanation-heading">答案解析</h2></div></div><p>{question.explanation}</p></section>
           </div>

@@ -68,7 +68,7 @@ npm run admin:create -- test
 
 `db:migrate` 依序套用尚未執行的 migration；重跑時已套用的檔案會略過。`db:seed` 載入本機示範分類、技能和題目，不會建立共用帳密。`admin:create` 會在終端機隱藏密碼輸入；密碼需 12 到 72 個字，包含英文字母和數字。每位組員使用自己的本機密碼。
 
-目前這台電腦的 `skill_tree_dev` 使用 PostgreSQL 17.12、連接埠 5433，migration 001 到 007 已套用，示範資料為 6 個分類、15 個技能和 8 道題目。這些本機資料和本機登入帳號不會隨 PR 分享；組員各自跑 migration 和 seed 後會得到相同的起始結構與示範資料。
+目前這台電腦的 `skill_tree_dev` 使用 PostgreSQL 17.12、連接埠 5433，migration 001 到 008 已套用，示範資料為 6 個分類、15 個技能和 8 道題目。這些本機資料和本機登入帳號不會隨 PR 分享；組員各自跑 migration 和 seed 後會得到相同的起始結構與示範資料。
 
 ## 3. 啟動 API 和前端
 
@@ -98,9 +98,9 @@ curl -i http://127.0.0.1:3000/api/health
 
 1. E01 首頁應顯示資料庫中的題目數、分類分布和最近更新。
 2. E02 題庫列表可用題目文字或編號搜尋，並依分類、狀態篩選。
-3. E03 新增一筆草稿，儲存後會寫進 PostgreSQL。
-4. E04 應讀回剛才儲存的題目、選項、正解、解析和更新時間。
-5. 從 E04 編輯題目並再次儲存，確認新內容回讀成功。
+3. E03 新增一筆草稿，選擇「多選」，建立四個選項，為每個選項填寫解析並標記至少兩個正解，儲存後會寫進 PostgreSQL。
+4. E04 應讀回剛才儲存的作答方式、所有選項、每個選項解析、正確答案、整題解析和更新時間。
+5. 從 E04 編輯題目，切換單選／多選並增刪選項後再次儲存，確認新內容回讀成功。題庫支援 2 到 10 個選項。
 6. 從 E02 軟刪除測試題目；刪除會設定 `deleted_at`，不是直接刪掉資料列。
 
 也可以用 `psql` 查看非刪除題目。連接埠和帳號請換成自己的設定：
@@ -110,13 +110,18 @@ psql -h 127.0.0.1 -p 5432 -U skill_tree_app -d skill_tree_dev
 ```
 
 ```sql
-SELECT id, prompt, status, correct_choice, updated_at
+SELECT id, prompt, status, answer_mode, correct_choices,
+       choices, choice_explanations, explanation, updated_at
 FROM questions
 WHERE deleted_at IS NULL
 ORDER BY updated_at DESC;
 ```
 
 草稿的 `active` 會是 `false`，所以查詢題庫時應用 `deleted_at IS NULL` 排除已刪除項目，不要只用 `active = true`，否則會漏掉草稿。
+
+題庫 API 的正式欄位為 `answerMode`、`choices`、`choiceExplanations` 和 `correctChoices`。選項索引從 0 開始；單選題使用一個正確索引，多選題使用至少兩個。測驗模組 C 讀取 `correctChoices` 判定作答，使用 `selectedChoices` 保存使用者選取的索引；舊欄位 `correctChoice`／`selectedChoice` 僅為單選相容欄位。API 成功和錯誤 envelope、HTTP 狀態碼與錯誤欄位格式請依根目錄 README 的「共用回應與錯誤格式」使用。
+
+`GET /api/skills` 提供公開技能目錄；以 `skillId` 作為技能識別欄位，並回傳 `catalogVersion`、分類、學習項目、座標和 `prerequisiteSkillIds`。`GET /api/progress` 需登入，回傳同一組 `skillId` 值作為 `completedSkillIds`，B 負責依完成狀態呈現節點，D 負責進度統計。
 
 ## 5. API 路由與共同格式
 
