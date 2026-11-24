@@ -1,0 +1,57 @@
+
+/* Skill Tree | Register page — component-scoped styles */
+.st-register-page, .st-register-page * { box-sizing: border-box; }
+.st-register-page {
+  --st-bg: #0d140f;
+  --st-panel: #162119;
+  --st-input: #111a13;
+  --st-border: #28382d;
+  --st-input-border: #3b503f;
+  --st-accent: #c5f07a;
+  --st-text: #e9efe6;
+  --st-muted: #91a395;
+  flex: 1;
+  background: var(--st-bg);
+  color: var(--st-text);
+  font: 400 clamp(12px, 1.3483vw, 16px)/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+}
+.st-register-page button, .st-register-page input { font: inherit; }
+
+
+
+
+
+.st-register-main { display: flex; justify-content: center; padding: 1.4167em 1em 3em; }
+.st-register-form { width: 100%; max-width: 25.6667em; margin: 0; }
+.st-register-card { min-width: 0; margin: 0; padding: .8333em .9167em 1em; background: var(--st-panel); border: 1px solid var(--st-border); border-radius: .75em; box-shadow: 0 2em 4em rgba(0,0,0,.09); }
+.st-register-card legend { margin-left: 0; padding: 0 .35em; color: var(--st-accent); font-weight: 600; }
+.st-register-page button { cursor: pointer; }
+.st-register-button { display: flex; justify-content: center; align-items: center; width: 100%; min-height: 2.5833em; padding: .35em .75em; border: 1px solid #8fb260; border-radius: .5em; background: transparent; color: var(--st-accent); font-weight: 600; transition: background .15s, border-color .15s; }
+.st-register-google:hover, .st-register-toggle:hover { background: #223025; border-color: var(--st-accent); }
+.st-register-divider { display: flex; align-items: center; gap: .75em; margin: 1em 0 .9167em; color: var(--st-muted); font-size: .9167em; }
+.st-register-divider::before, .st-register-divider::after { content: ""; height: 1px; flex: 1; background: var(--st-border); }
+.st-register-field { display: flex; flex-direction: column; gap: .25em; }
+.st-register-field label { font-weight: 600; }
+.st-register-input { width: 100%; min-width: 0; height: 2.75em; padding: .4em .75em; color: var(--st-text); background: var(--st-input); border: 1px solid var(--st-input-border); border-radius: .5em; outline: none; }
+.st-register-input:focus { border-color: var(--st-accent); box-shadow: 0 0 0 2px #c5f07220; }
+.st-register-email { margin-bottom: 2.1667em; }
+.st-register-password { margin-bottom: 1em; }
+.st-register-password-row { display: flex; gap: .4167em; }
+.st-register-toggle { width: 3.75em; flex: 0 0 3.75em; background: var(--st-input); border: 1px solid var(--st-input-border); border-radius: .5em; color: var(--st-accent); font-size: .9167em !important; font-weight: 600 !important; }
+.st-register-hint { margin: -.1em 0 0 .5em; font-size: .8333em; }
+.st-register-submit { margin-top: 4em; background: var(--st-accent); color: var(--st-bg); border-color: var(--st-accent); }
+.st-register-submit:hover { background: #d5fa97; }
+.st-register-login { margin: .75em 0 0; font-size: .9167em; }
+.st-register-login a { color: var(--st-accent); text-underline-offset: .14em; }
+.st-register-page a:focus-visible, .st-register-page button:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 3px; }
+@media (max-width: 600px) {
+  .st-register-page { font-size: 14px; }
+
+  .st-register-main { padding: 1.75em 1em 3em; }
+  .st-register-form { max-width: 26em; }
+  .st-register-input { font-size: 16px !important; height: 44px; }
+  .st-register-button, .st-register-toggle { min-height: 44px; }
+  .st-register-email { margin-bottom: 1.5em; }
+  .st-register-submit { margin-top: 2.5em; }
+}
+@media (prefers-reduced-motion: reduce) { .st-register-page * { transition: none; } }
