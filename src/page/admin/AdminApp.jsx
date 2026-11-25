@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { getCurrentAdmin, logoutAdmin } from "../../services/adminAuth";
 import AdminDashboard from "./AdminDashboard";
 import AdminLoginPage from "./AdminLoginPage";
+import AdminMembersPage from "./AdminMembersPage";
+import AdminMemberDetailPage from "./AdminMemberDetailPage";
 import AdminQuestionBankPage from "./AdminQuestionBankPage";
 import AdminQuestionDetailPage from "./AdminQuestionDetailPage";
 import AdminQuestionFormPage from "./AdminQuestionFormPage";
@@ -74,6 +76,8 @@ export default function AdminApp() {
 
   const sharedProps = { admin, onLogout: handleLogout };
   if (path === "/admin" || path === "/admin/login") return <AdminDashboard {...sharedProps} />;
+  if (path === "/admin/members") return <AdminMembersPage {...sharedProps} />;
+  if (/^\/admin\/members\/[^/]+$/.test(path)) return <AdminMemberDetailPage {...sharedProps} />;
   if (path === "/admin/questions") return <AdminQuestionBankPage {...sharedProps} />;
   if (path === "/admin/questions/new" || /^\/admin\/questions\/[^/]+\/edit$/.test(path)) {
     return <AdminQuestionFormPage {...sharedProps} />;

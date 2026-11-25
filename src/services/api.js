@@ -1,13 +1,15 @@
 export class ApiRequestError extends Error {
     status;
     code;
-    details;
-    constructor(status, error) {
-        super(error.message);
+    requestId;
+    fields;
+    constructor(status, error = {}) {
+        super(error.message || "請求失敗，請稍後再試。");
         this.name = "ApiRequestError";
         this.status = status;
-        this.code = error.code;
-        this.details = error.details;
+        this.code = error.code || "REQUEST_FAILED";
+        this.requestId = error.requestId;
+        this.fields = error.fields;
     }
 }
 export async function apiRequest(path, init = {}) {
@@ -32,8 +34,8 @@ export async function apiRequest(path, init = {}) {
             message: "伺服器回應格式錯誤，請稍後再試。",
         });
     }
-    if (!response.ok) {
-        throw new ApiRequestError(response.status, payload.error ?? {
+    if (!response.ok || payload?.success !== true) {
+        throw new ApiRequestError(response.status, payload?.error ?? {
             code: "REQUEST_FAILED",
             message: "請求失敗，請稍後再試。",
         });

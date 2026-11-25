@@ -5,10 +5,10 @@ import { requireMember } from '../middleware/require-member.js';
 import { HttpError, validationError } from '../lib/http-error.js';
 import { sendSuccess } from '../lib/api-response.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
-import { isValidEmail, normalizeEmail, validateLogin, validateNewPassword, validateRegistration } from '../lib/validation.js';
+import { isValidEmail, normalizeEmail, validateLogin, validateMemberProfile, validateNewPassword, validateRegistration } from '../lib/validation.js';
 import { assertLoginNotBlocked, clearLoginFailures, hashRateLimitSubject, recordLoginFailure } from '../services/auth-rate-limit.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../services/email-service.js';
-import { createMemberSession, revokeMemberSession } from '../services/session-service.js';
+import { clearMemberSessionCookie, createMemberSession, revokeMemberSession } from '../services/session-service.js';
 
 export const authRouter = Router();
 
@@ -20,10 +20,10 @@ function dummyPasswordHash() {
 
 function memberPayload(member) {
   return {
-    id: String(member.id),
+    userId: String(member.id),
     email: member.email,
     createdAt: new Date(member.createdAt).toISOString(),
-    nickname: member.nickname,
+    username: member.nickname,
     avatarId: member.avatarId,
     route: member.route,
     onboardingCompleted: member.onboardingCompleted,
@@ -215,12 +215,30 @@ authRouter.post('/auth/forgot-password', async (request, response, next) => {
   }
 });
 
+authRouter.post('/auth/reset-password/verify', async (request, response, next) => {
+  const token = typeof request.body?.token === 'string' ? request.body.token : '';
+  try {
+    if (!token || token.length > 256) {
+      throw new HttpError(400, 'INVALID_OR_EXPIRED_TOKEN', '重設連結無效或已過期');
+    }
+    const result = await pool.query(
+      `SELECT 1 FROM email_tokens
+       WHERE token_hash = $1 AND purpose = 'reset_password' AND used_at IS NULL AND expires_at > now()`,
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new HttpError(400, 'INVALID_OR_EXPIRED_TOKEN', '重設連結無效或已過期');
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 authRouter.post('/auth/reset-password', async (request, response, next) => {
   const token = typeof request.body?.token === 'string' ? request.body.token : '';
   const newPassword = request.body?.password;
   try {
     validateNewPassword(newPassword, 'password');
-    if (!token || token.length > 256) throw new HttpError(400, 'INVALID_TOKEN', '重設連結無效或已過期');
+    if (!token || token.length > 256) throw new HttpError(400, 'INVALID_OR_EXPIRED_TOKEN', '重設連結無效或已過期');
 
     const client = await pool.connect();
     try {
@@ -232,7 +250,7 @@ authRouter.post('/auth/reset-password', async (request, response, next) => {
         [tokenDigest(token)],
       );
       const resetToken = tokenResult.rows[0];
-      if (!resetToken) throw new HttpError(400, 'INVALID_TOKEN', '重設連結無效或已過期');
+      if (!resetToken) throw new HttpError(400, 'INVALID_OR_EXPIRED_TOKEN', '重設連結無效或已過期');
 
       const passwordHash = await hashPassword(newPassword);
       await client.query(
@@ -243,6 +261,7 @@ authRouter.post('/auth/reset-password', async (request, response, next) => {
       await client.query('UPDATE email_tokens SET used_at = now() WHERE id = $1', [resetToken.id]);
       await client.query('DELETE FROM member_sessions WHERE user_id = $1', [resetToken.user_id]);
       await client.query('COMMIT');
+      clearMemberSessionCookie(response);
       response.status(204).end();
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
@@ -306,6 +325,44 @@ authRouter.post('/auth/change-password', requireMember, async (request, response
 
 authRouter.get('/me', requireMember, (request, response) => {
   sendSuccess(response, memberPayload(request.member));
+});
+
+authRouter.patch('/me/profile', requireMember, async (request, response, next) => {
+  let profile;
+  try {
+    profile = validateMemberProfile(request.body?.username, request.body?.avatarId);
+  } catch (error) {
+    return next(error);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO member_profiles(user_id, nickname, avatar_id, onboarding_completed, updated_at)
+       VALUES ($1, $2, $3, true, now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         nickname = EXCLUDED.nickname,
+         avatar_id = EXCLUDED.avatar_id,
+         onboarding_completed = true,
+         updated_at = now()`,
+      [request.member.id, profile.username, profile.avatarId],
+    );
+    await client.query('COMMIT');
+    sendSuccess(response, memberPayload({
+      ...request.member,
+      nickname: profile.username,
+      avatarId: profile.avatarId,
+      onboardingCompleted: true,
+    }));
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    next(error.code === '23505'
+      ? new HttpError(409, 'USERNAME_TAKEN', '此暱稱已被使用')
+      : error);
+  } finally {
+    client.release();
+  }
 });
 
 authRouter.post('/auth/logout', async (request, response, next) => {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { requireMember } from '../middleware/require-member.js';
 import { sendSuccess } from '../lib/api-response.js';
+import { readActiveCatalogVersion } from '../services/progress-service.js';
 
 export const progressRouter = Router();
 progressRouter.get('/progress', requireMember, async (request, response, next) => {
@@ -16,12 +17,10 @@ progressRouter.get('/progress', requireMember, async (request, response, next) =
       'SELECT skill_id AS "skillId" FROM user_skill_completions WHERE user_id = $1 ORDER BY skill_id',
       [request.member.id],
     );
-    const catalogResult = await client.query(
-      'SELECT COALESCE(MAX(catalog_version), 1)::int AS version FROM skills WHERE active = true',
-    );
+    const catalogVersion = await readActiveCatalogVersion(client);
     await client.query('COMMIT');
     sendSuccess(response, {
-      catalogVersion: catalogResult.rows[0].version,
+      catalogVersion,
       revision: revisionResult.rows[0]?.revision ?? '0',
       completedSkillIds: completionResult.rows.map((row) => row.skillId),
     });

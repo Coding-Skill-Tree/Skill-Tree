@@ -36,12 +36,17 @@ Vite 將 `/api` 代理至 `http://127.0.0.1:3000`。前端和後端需同時執�
 
 新組員的逐步資料庫設定、API 測試和模組整合流程請看[後端與資料庫上手指南](docs/backend-onboarding.md)。
 
+A–E 共用的正式路由、欄位名稱、回應格式、認證方式及資料責任請看[API 契約 v1](docs/api-contract.md)。各模組實作 API 前先依這份契約對齊。
+
+共用資料表、關聯、索引、migration 清單和資料責任請看[PostgreSQL Schema 概覽](docs/database-schema.md)。
+
 ## E 管理後台
 
 - E01 顯示資料庫中的題目總數、已發布／草稿數、分類分布和最近新增題目。
 - E02 題庫列表支援伺服器端搜尋、分類／狀態篩選、分頁和軟刪除。
 - E03 新增／編輯表單會載入資料庫中的技能節點並儲存題目、2 到 10 個選項、每個選項的解析、單選／多選答案、整題解析、難度與狀態。
 - E04 題目詳情由資料庫載入，顯示作答方式、所有正解、每個選項的解析、整題解析及建立／更新時間。
+- A09／A10 會員管理已接入共用後台，可搜尋會員、查看會員／學習資料並停權或恢復帳號。
 - 管理畫面使用獨立管理員 session；未登入時需先登入，資料庫與 API 尚未啟動時會顯示連線提示。
 - 深色表面、青檸綠主色、共用 tokens、1440px 內容寬度與 1279／940／639px 版面斷點延續目前主線 dashboard。後台操作按鈕維持至少 44px 觸控高度。
 
@@ -49,18 +54,20 @@ Vite 將 `/api` 代理至 `http://127.0.0.1:3000`。前端和後端需同時執�
 
 - `GET /api/health`：API 與資料庫連線狀態。
 - `/api/auth/*`、`GET /api/me`：會員註冊、Email 驗證、登入、登出與會員狀態。
+- `POST /api/auth/reset-password/verify`、`POST /api/auth/reset-password`：非消耗式重設連結檢查與一次性密碼重設。
+- `PATCH /api/me/profile`：會員更新自己的暱稱、角色圖片並完成 onboarding；會員身份由 `sid` session 決定。
 - `/api/admin/auth/login`、`GET /api/admin/me`、`POST /api/admin/auth/logout`：獨立管理員 session。
 - `/api/admin/questions`：管理員題庫查詢、新增、編輯、軟刪除、分類／技能選項與總覽摘要。
 - `/api/admin/members`、`/api/admin/members/:id`：A09 會員搜尋與分頁、A10 會員詳情；詳情提供角色、Google 綁定、XP、等級、學習進度及停權／恢復操作。
 - `GET /api/skills`：公開唯讀技能目錄，提供分類、技能節點、學習項目、位置、先修關係與 `catalogVersion`。
-- `GET /api/progress`：登入會員讀取 `catalogVersion`、`revision`、`completedSkillIds`。
+- `GET /api/progress`：登入會員讀取 `catalogVersion`、`revision`、`completedSkillIds`。C 後端在 transaction 中呼叫 E 的 completion service 寫入通過的技能；沒有瀏覽器可傳入 `userId` 的通用寫入端點。
 
-成功回應使用 `{ "success": true, "data": ... }`，錯誤使用 `{ "success": false, "error": { "code", "message", "requestId", "details" } }`。BIGINT ID 以字串傳送，時間使用 UTC ISO 8601。管理員會員 API 對齊 A 組第一階段假 API 欄位；角色和等級存於會員資料，等級公式仍待小組確認；Google 綁定資料由 `member_auth_identities` 保存，但 OAuth 串接尚未實作。XP 與分類進度分別讀取帳本和完成紀錄。前端共用 API client 在 `src/services/api.js`；管理員登入和題庫 adapter 分別在 `src/services/adminAuth.js`、`src/services/adminQuestions.js`。
+成功回應使用 `{ "success": true, "data": ... }`，錯誤使用 `{ "success": false, "error": { "code", "message", "requestId", "fields?" } }`。BIGINT ID 以字串傳送，時間使用 UTC ISO 8601。管理員會員 API 對齊 A 組第一階段假 API 欄位；角色和等級存於會員資料，等級公式仍待小組確認；Google 綁定資料由 `member_auth_identities` 保存，但 OAuth 串接尚未實作。XP 與分類進度分別讀取帳本和完成紀錄。前端共用 API client 在 `src/services/api.js`；管理員登入和題庫 adapter 分別在 `src/services/adminAuth.js`、`src/services/adminQuestions.js`。
 
 ### 共用回應與錯誤格式（E-06）
 
 - 成功：`{ "success": true, "data": { ... } }`；建立資源回傳 HTTP 201，查詢／更新回傳 HTTP 200。登出和軟刪除等無內容操作回傳 HTTP 204，不帶 JSON body。
-- 錯誤：`{ "success": false, "error": { "code": "VALIDATION_ERROR", "message": "表單內容有誤", "requestId": "...", "details": { "fields": { ... } }, "fields": { ... } } }`。`fields` 只在欄位驗證錯誤時出現。
+- 錯誤：`{ "success": false, "error": { "code": "VALIDATION_ERROR", "message": "表單內容有誤", "requestId": "...", "fields": { ... } } }`。`fields` 只在欄位驗證錯誤時出現。
 - 使用 HTTP 400 表示請求或欄位格式錯誤、401 表示未登入、403 表示權限不足、404 表示資源不存在、409 表示資料衝突；資料庫暫時無法使用時回傳 503。
 - API client 應先檢查 `success`，再讀取 `data`；錯誤時使用 `error.code`、`error.message` 和可選的 `error.fields` 顯示對應訊息。
 
@@ -95,4 +102,6 @@ Vite 將 `/api` 代理至 `http://127.0.0.1:3000`。前端和後端需同時執�
 
 資料庫進度表使用 `user_skill_completions`，migration 006 將舊 scaffold 表名 `completed_skills` 遷移至共用名稱；migration 007 增加會員角色、等級與 Google 綁定資料。等級計算規則和 Google OAuth 流程仍待小組確認，既有 migration 保持不變。
 
-C 負責測驗 UI、測驗開始／作答／評分／歷史 API；本次沒有新增這些測驗端點。進度 API 是 E 提供的共用讀取介面。尚未接入正式部署環境、正式 SMTP 或 production 資料庫，請以各組員完成本機 migrations 與 API health 檢查作為環境驗收依據。
+C 在共用 Express 中負責測驗開始／作答／評分／歷史 routes，並呼叫僅供 backend 使用的 E 題庫 repository；不得把管理員題庫 API 或正解欄位提供給瀏覽器。每個 active skill 至少需 5 道正式已發布題目；`npm run db:question-coverage` 可檢查題數，展示 seed 不算正式題目。
+
+後端整合測試使用獨立 PostgreSQL test database，設定 `TEST_DATABASE_URL` 後執行 `npm run test:api`。runner 只接受名稱包含 `test` 的資料庫，會拒絕與 `DATABASE_URL` 指到相同資料庫，並且不會 drop 資料庫。正式部署、production SMTP 和共用資料庫仍需由團隊另外驗收。

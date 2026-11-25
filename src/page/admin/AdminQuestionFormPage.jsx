@@ -202,7 +202,7 @@ export default function AdminQuestionFormPage({ admin, onLogout }) {
         : await createAdminQuestion(payload);
       window.location.assign(`/admin/questions/${encodeURIComponent(savedQuestion.id)}`);
     } catch (requestError) {
-      const fieldErrors = requestError.details?.fields || requestError.details?.details?.fields;
+      const fieldErrors = requestError.fields;
       if (fieldErrors) {
         setServerErrors({
           ...(fieldErrors.skillId ? { skillId: fieldErrors.skillId } : {}),

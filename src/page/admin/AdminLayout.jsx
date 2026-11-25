@@ -13,9 +13,9 @@ export default function AdminLayout({ children, activePage, breadcrumb, question
           <span className="admin-nav-label">工作區</span>
           <a className={`admin-nav-link${activePage === "overview" ? " is-active" : ""}`} href="/admin" aria-current={activePage === "overview" ? "page" : undefined}><AdminIcon name="grid"/>後台總覽</a>
           <a className={`admin-nav-link${activePage === "questions" ? " is-active" : ""}`} href="/admin/questions" aria-current={activePage === "questions" ? "page" : undefined}><AdminIcon name="stack"/>題庫管理{questionCount !== undefined && <span className="admin-nav-count">{questionCount}</span>}</a>
-          <span className="admin-nav-label admin-nav-label-spaced">內容管理</span>
+          <span className="admin-nav-label admin-nav-label-spaced">管理工具</span>
+          <a className={`admin-nav-link${activePage === "members" ? " is-active" : ""}`} href="/admin/members" aria-current={activePage === "members" ? "page" : undefined}><AdminIcon name="users"/>會員管理</a>
           <a className="admin-nav-link" href="/admin/questions/new"><AdminIcon name="plus"/>新增題目</a>
-          <span className="admin-nav-link is-disabled" aria-disabled="true"><AdminIcon name="users"/>會員管理<span className="soon-label">規劃中</span></span>
         </nav>
         <div className="admin-sidebar-bottom">
           <div className="admin-sidebar-user"><span className="admin-avatar">{admin?.username?.slice(0, 1)?.toUpperCase() || "A"}</span><span><strong>{admin?.username || "管理員"}</strong><small>管理員帳號</small></span></div>
@@ -34,6 +34,7 @@ export default function AdminLayout({ children, activePage, breadcrumb, question
       <nav className="admin-mobile-nav" aria-label="快速導覽">
         <a className={activePage === "overview" ? "is-active" : ""} href="/admin" aria-current={activePage === "overview" ? "page" : undefined}><AdminIcon name="grid" size={19}/><span>總覽</span></a>
         <a className={activePage === "questions" ? "is-active" : ""} href="/admin/questions" aria-current={activePage === "questions" ? "page" : undefined}><AdminIcon name="stack" size={19}/><span>題庫</span></a>
+        <a className={activePage === "members" ? "is-active" : ""} href="/admin/members" aria-current={activePage === "members" ? "page" : undefined}><AdminIcon name="users" size={19}/><span>會員</span></a>
         <a href="/admin/questions/new"><AdminIcon name="plus" size={19}/><span>新增</span></a>
       </nav>
     </div>);

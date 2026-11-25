@@ -11,6 +11,8 @@
     "preview": "vite preview",
     "db:migrate": "npm --prefix backend run db:migrate",
     "db:seed": "npm --prefix backend run db:seed",
+    "db:question-coverage": "npm --prefix backend run db:question-coverage",
+    "test:api": "npm --prefix backend run test:api",
     "admin:create": "npm --prefix backend run admin:create --"
   },
   "dependencies": {
