@@ -1,50 +1,40 @@
 import { useEffect, useState } from "react";
-import { DEMO_LINKS, PROFILE_TEXT, ROUTES } from "./data/profileContent.js";
-import { getMe, logout } from "./utils/fakeSessionApi.js";
+import { PROFILE_TEXT, ROUTES } from "./data/profileContent.js";
+import { ApiRequestError } from "../../../services/api.js";
+import { getMe, logout } from "../../../services/memberAuth.js";
 import SiteHeader from "./components/SiteHeader/SiteHeader.jsx";
 import PageStatus from "./components/PageStatus/PageStatus.jsx";
 import BasicInfo from "./components/BasicInfo/BasicInfo.jsx";
 import GameDataEntry from "./components/GameDataEntry/GameDataEntry.jsx";
-// 示範區塊和忘記密碼頁共用
-import DemoHint from "../forget_pwd/components/DemoHint/DemoHint.jsx";
 import "./ProfilePage.css";
-
-// 依登入狀態決定結果：
-// 未登入 → /login；未完成建立角色 → /onboarding；已完成 → 顯示頁面；
-// 網路錯誤或 5xx → 顯示「載入失敗」與重試，不導頁。
-function resolveSession(result) {
-  const { status, body } = result;
-  if (status === 401) return { redirect: ROUTES.login };
-  if (status === 200 && body?.success) {
-    const user = body.data;
-    if (!user.onboardingCompleted) return { redirect: ROUTES.onboarding };
-    return { user };
-  }
-  return { error: true };
-}
 
 function ProfilePage() {
   const [status, setStatus] = useState("loading"); // loading | error | ready
   const [user, setUser] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
 
   // 載入登入狀態；attempt 改變（按重試）時再請求一次
   useEffect(() => {
     let alive = true;
-    getMe({ isRetry: attempt > 0 })
-      .then(resolveSession)
-      .catch(() => ({ error: true }))
-      .then((outcome) => {
+    getMe()
+      .then((member) => {
         if (!alive) return;
-        if (outcome.redirect) {
-          window.location.replace(outcome.redirect);
-        } else if (outcome.user) {
-          setUser(outcome.user);
-          setStatus("ready");
+        if (!member.onboardingCompleted) {
+          window.location.replace(ROUTES.onboarding);
         } else {
-          setStatus("error");
+          setUser(member);
+          setStatus("ready");
         }
+      })
+      .catch((error) => {
+        if (!alive) return;
+        if (error instanceof ApiRequestError && error.status === 401) {
+          window.location.replace(ROUTES.login);
+          return;
+        }
+        setStatus("error");
       });
     return () => {
       alive = false;
@@ -58,8 +48,14 @@ function ProfilePage() {
 
   async function handleLogout() {
     setLoggingOut(true);
-    await logout();
-    window.location.assign(ROUTES.home); // 登出後回到歡迎頁
+    setLogoutError(false);
+    try {
+      await logout();
+      window.location.assign(ROUTES.home);
+    } catch {
+      setLogoutError(true);
+      setLoggingOut(false);
+    }
   }
 
   return (
@@ -93,18 +89,9 @@ function ProfilePage() {
             >
               {loggingOut ? PROFILE_TEXT.loggingOut : PROFILE_TEXT.logout}
             </button>
+            {logoutError && <p className="profile-logout-error" role="alert">{PROFILE_TEXT.logoutFailed}</p>}
           </div>
         )}
-
-        <DemoHint>
-          <p className="demo-hint-links">
-            {DEMO_LINKS.map((item) => (
-              <a key={item.label} className="text-link" href={item.href}>
-                {item.label}
-              </a>
-            ))}
-          </p>
-        </DemoHint>
       </main>
     </div>
   );

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DEMO_LINKS, RESET_TEXT, ROUTES } from "./data/resetContent.js";
+import { RESET_TEXT, ROUTES } from "./data/resetContent.js";
 import { validateConfirm, validatePassword } from "./utils/validators.js";
-import { resetPassword, verifyResetToken } from "./utils/fakeResetApi.js";
+import { ApiRequestError } from "../../../services/api.js";
+import { resetPassword, verifyResetToken } from "../../../services/memberAuth.js";
 import PasswordField from "./components/PasswordField/PasswordField.jsx";
-// 頁首、卡片、彈窗、浮動通知、示範區塊和忘記密碼頁共用，放在 forget_pwd/components
+// 頁首、卡片、彈窗和浮動通知元件放在 forget_pwd/components 共用。
 import AuthHeader from "../forget_pwd/components/AuthHeader/AuthHeader.jsx";
 import AuthCard from "../forget_pwd/components/AuthCard/AuthCard.jsx";
 import Modal from "../forget_pwd/components/Modal/Modal.jsx";
 import FloatingNotice from "../forget_pwd/components/FloatingNotice/FloatingNotice.jsx";
-import DemoHint from "../forget_pwd/components/DemoHint/DemoHint.jsx";
 
 // 從網址 ?token=... 取得重設 token
 const token = new URLSearchParams(window.location.search).get("token");
@@ -22,6 +22,7 @@ function ResetPasswordPage() {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [checkAttempt, setCheckAttempt] = useState(0);
   const passwordRef = useRef(null);
   const confirmRef = useRef(null);
   const clearNotice = useCallback(() => setNotice(null), []);
@@ -30,13 +31,20 @@ function ResetPasswordPage() {
   useEffect(() => {
     if (!token) return undefined;
     let alive = true;
-    verifyResetToken(token).then(({ status }) => {
-      if (alive) setLinkState(status === 204 ? "ready" : "invalid");
+    verifyResetToken(token).then(() => {
+      if (alive) setLinkState("ready");
+    }).catch((error) => {
+      if (!alive) return;
+      if (error instanceof ApiRequestError && error.code === "INVALID_OR_EXPIRED_TOKEN") {
+        setLinkState("invalid");
+      } else {
+        setLinkState("error");
+      }
     });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [checkAttempt]);
 
   const passwordError = validatePassword(password);
   const confirmError = validateConfirm(password, confirm);
@@ -49,18 +57,24 @@ function ResetPasswordPage() {
     if (confirmError) return confirmRef.current?.focus();
 
     setSending(true);
-    const { status, body } = await resetPassword(token, password);
-    setSending(false);
-
-    if (status === 204) {
-      // 正式版：導向 /login 並顯示浮動通知；第一階段先在本頁顯示完成畫面
+    try {
+      await resetPassword(token, password);
       setDone(true);
       setNotice({ id: Date.now(), text: RESET_TEXT.successNotice });
-    } else if (body?.error?.code === "INVALID_TOKEN") {
-      setLinkState("invalid"); // 開啟後才過期，一樣跳出無效彈窗
-    } else {
-      setNotice({ id: Date.now(), text: RESET_TEXT.genericError });
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.code === "INVALID_OR_EXPIRED_TOKEN") {
+        setLinkState("invalid");
+      } else {
+        setNotice({ id: Date.now(), text: RESET_TEXT.genericError });
+      }
+    } finally {
+      setSending(false);
     }
+  }
+
+  function retryTokenCheck() {
+    setLinkState("checking");
+    setCheckAttempt((attempt) => attempt + 1);
   }
 
   return (
@@ -72,17 +86,6 @@ function ResetPasswordPage() {
         title={done ? RESET_TEXT.successTitle : RESET_TEXT.title}
         description={
           done ? RESET_TEXT.successDescription : RESET_TEXT.description
-        }
-        footer={
-          <DemoHint>
-            <p className="demo-hint-links">
-              {DEMO_LINKS.map((item) => (
-                <a key={item.label} className="text-link" href={item.href}>
-                  {item.label}
-                </a>
-              ))}
-            </p>
-          </DemoHint>
         }
       >
         {done ? (
@@ -103,6 +106,14 @@ function ResetPasswordPage() {
               <p className="auth-card-status" role="status">
                 {RESET_TEXT.checking}
               </p>
+            )}
+            {linkState === "error" && (
+              <div className="auth-card-status" role="alert">
+                <p>{RESET_TEXT.verifyFailed}</p>
+                <button type="button" className="text-link" onClick={retryTokenCheck}>
+                  {RESET_TEXT.retryVerification}
+                </button>
+              </div>
             )}
 
             <PasswordField

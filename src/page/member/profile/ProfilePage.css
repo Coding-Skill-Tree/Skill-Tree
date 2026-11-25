@@ -64,6 +64,13 @@
   gap: 12px;
 }
 
+.profile-logout-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 14px;
+}
+
 /* ---------- 斷點 ---------- */
 
 /* 640px 以上：卡片內距加大 */

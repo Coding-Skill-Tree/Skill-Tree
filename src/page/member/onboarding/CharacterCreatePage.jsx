@@ -1,43 +1,67 @@
-import { useEffect, useRef, useState } from "react";
-import { AVATARS, PAGE_TEXT } from "./data/characterOptions.js";
+import { useState } from "react";
+import { AVATARS, PAGE_TEXT, ROUTES } from "./data/characterOptions.js";
 import { validateNickname } from "./utils/validateNickname.js";
+import { ApiRequestError } from "../../../services/api.js";
+import { completeOnboarding } from "../../../services/memberAuth.js";
 import SiteHeader from "./components/SiteHeader/SiteHeader.jsx";
 import NicknameField from "./components/NicknameField/NicknameField.jsx";
 import AvatarPicker from "./components/AvatarPicker/AvatarPicker.jsx";
 import "./CharacterCreatePage.css";
 
-// 第一階段：只做畫面，不串 API。
-// 按下「開始冒險」後模擬送出 0.8 秒，再顯示示範用的完成訊息（之後改成呼叫 API 並導向 /learn）。
-const DEMO_SUBMIT_MS = 800;
-
 function CharacterCreatePage() {
-  // 輸入只存在頁面記憶體，重新整理後清空（規格要求）
   const [nickname, setNickname] = useState("");
   const [nicknameTouched, setNicknameTouched] = useState(false);
   const [avatarId, setAvatarId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [doneMessage, setDoneMessage] = useState("");
-  const timerRef = useRef(null);
+  const [submitError, setSubmitError] = useState("");
+  const [serverNicknameError, setServerNicknameError] = useState("");
+  const [completed, setCompleted] = useState(false);
 
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
-  const nicknameError = validateNickname(nickname);
-  // 離開欄位後才開始顯示錯誤，之後邊打字邊更新
+  const nicknameError = serverNicknameError || validateNickname(nickname);
   const visibleError = nicknameTouched ? nicknameError : "";
-  const canSubmit = !nicknameError && avatarId !== null && !submitting;
+  const canSubmit = !nicknameError && avatarId !== null && !submitting && !completed;
 
-  function handleSubmit(event) {
+  function updateNickname(value) {
+    setNickname(value);
+    setServerNicknameError("");
+    setSubmitError("");
+    setDoneMessage("");
+    setCompleted(false);
+  }
+
+  function updateAvatar(avatar) {
+    setAvatarId(avatar);
+    setSubmitError("");
+    setDoneMessage("");
+    setCompleted(false);
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault();
     if (!canSubmit) return;
 
-    const payload = { username: nickname.trim(), avatarId };
     setSubmitting(true);
     setDoneMessage("");
-    timerRef.current = setTimeout(() => {
-      const avatarName = AVATARS.find((a) => a.id === payload.avatarId)?.name;
+    setSubmitError("");
+    setServerNicknameError("");
+    try {
+      const profile = await completeOnboarding({ username: nickname.trim(), avatarId });
+      const avatarName = AVATARS.find((a) => a.id === avatarId)?.name;
+      setDoneMessage(`角色建立完成：${profile.username}・${avatarName}`);
+      setCompleted(true);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.code === "USERNAME_TAKEN") {
+        setServerNicknameError(error.message);
+        setNicknameTouched(true);
+      } else if (error instanceof ApiRequestError && error.status === 401) {
+        window.location.replace(ROUTES.login);
+      } else {
+        setSubmitError(PAGE_TEXT.submitFailed);
+      }
+    } finally {
       setSubmitting(false);
-      setDoneMessage(`（示範）角色建立完成：${payload.username}・${avatarName}`);
-    }, DEMO_SUBMIT_MS);
+    }
   }
 
   return (
@@ -55,14 +79,14 @@ function CharacterCreatePage() {
           <NicknameField
             value={nickname}
             error={visibleError}
-            onChange={setNickname}
+            onChange={updateNickname}
             onBlur={() => setNicknameTouched(true)}
           />
 
-          <AvatarPicker value={avatarId} onChange={setAvatarId} />
+          <AvatarPicker value={avatarId} onChange={updateAvatar} />
 
           <div className="character-card-actions">
-            {!canSubmit && !submitting && (
+            {!canSubmit && !submitting && !completed && (
               <p id="submit-hint" className="character-card-hint">
                 {PAGE_TEXT.disabledHint}
               </p>
@@ -71,15 +95,17 @@ function CharacterCreatePage() {
               type="submit"
               className="btn btn-primary btn-large"
               disabled={!canSubmit}
-              aria-describedby={!canSubmit && !submitting ? "submit-hint" : undefined}
+              aria-describedby={!canSubmit && !submitting && !completed ? "submit-hint" : undefined}
             >
               {submitting ? PAGE_TEXT.submittingLabel : PAGE_TEXT.submitLabel}
             </button>
           </div>
 
+          {submitError && <p className="character-card-error" role="alert">{submitError}</p>}
           <p className="character-card-status" role="status">
             {doneMessage}
           </p>
+          {completed && <a className="btn btn-primary" href={ROUTES.learn}>{PAGE_TEXT.learnLabel}</a>}
         </form>
       </main>
     </div>

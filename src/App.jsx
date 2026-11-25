@@ -4,6 +4,9 @@ import Quizs from "./page/quiz/QuizResultPage.jsx";
 import Dashboard from "./page/dashboard/Dashboard.jsx";
 import AdminApp from "./page/admin/AdminApp.jsx";
 import Home from "./page/home/Home.jsx";
+import CharacterCreatePage from "./page/member/onboarding/CharacterCreatePage.jsx";
+import ForgotPasswordPage from "./page/member/forget_pwd/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./page/member/reset_pwd/ResetPasswordPage.jsx";
 import { Routes, Route } from "react-router";
 
 function App() {
@@ -14,10 +17,13 @@ function App() {
       <Home />
       <Routes>
         <Route path="/profile" element={<Profile />} />
+        <Route path="/onboarding" element={<CharacterCreatePage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/skillmap" element={<SkillMap />} />
         <Route path="/quizs" element={<Quizs />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/admin" element={<AdminApp />} />
+        <Route path="/admin/*" element={<AdminApp />} />
       </Routes>
     </div>
   );

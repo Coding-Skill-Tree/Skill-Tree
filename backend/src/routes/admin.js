@@ -37,14 +37,14 @@ adminRouter.post('/auth/login', async (request, response, next) => {
 
     await clearLoginFailures('admin_login', subjectHash);
     await createAdminSession(admin.id, response);
-    sendSuccess(response, { id: String(admin.id), adminId: String(admin.id), username: admin.username });
+    sendSuccess(response, { adminId: String(admin.id), username: admin.username });
   } catch (error) {
     next(error);
   }
 });
 
 adminRouter.get('/me', requireAdmin, (request, response) => {
-  sendSuccess(response, { id: String(request.admin.id), adminId: String(request.admin.id), username: request.admin.username });
+  sendSuccess(response, { adminId: String(request.admin.id), username: request.admin.username });
 });
 
 adminRouter.post('/auth/logout', async (request, response, next) => {
@@ -94,10 +94,11 @@ function parseMembersQuery(query) {
 
 async function readMemberDetails(database, memberId) {
   const result = await database.query(
-    `SELECT u.id::text AS id, p.nickname, p.avatar_id AS "avatarId", p.role, p.level,
+    `SELECT u.id::text AS id, p.nickname, p.avatar_id AS "avatarId",
+            COALESCE(p.role, 'member') AS role, COALESCE(p.level, 1)::int AS level,
             u.email_normalized AS email,
             u.created_at AS "createdAt", p.route AS "learningRoute",
-            p.onboarding_completed AS "onboardingCompleted",
+            COALESCE(p.onboarding_completed, false) AS "onboardingCompleted",
             EXISTS (
               SELECT 1 FROM member_auth_identities identity
               WHERE identity.user_id = u.id AND identity.provider = 'google'
@@ -127,13 +128,11 @@ async function readMemberDetails(database, memberId) {
      ORDER BY c.sort_order, c.name`,
     [member.id],
   );
-  const xp = Number(xpResult.rows[0]?.xp ?? 0);
+  const xp = xpResult.rows[0]?.xp ?? '0';
   return {
-    id: member.id,
     userId: member.id,
     role: member.role,
     username: member.nickname,
-    nickname: member.nickname,
     avatarId: member.avatarId,
     email: member.email,
     createdAt: new Date(member.createdAt).toISOString(),
@@ -142,7 +141,7 @@ async function readMemberDetails(database, memberId) {
     googleLinked: member.googleLinked,
     suspended: member.suspended,
     suspendedAt: member.suspendedAt ? new Date(member.suspendedAt).toISOString() : null,
-    xp: Number.isSafeInteger(xp) ? xp : null,
+    xp,
     level: member.level,
     courseProgress: progressResult.rows,
   };
@@ -151,7 +150,7 @@ async function readMemberDetails(database, memberId) {
 adminRouter.get('/members', async (request, response, next) => {
   const client = await pool.connect();
   try {
-    const { keyword, page } = parseMembersQuery(request.query);
+    const { keyword, page: requestedPage } = parseMembersQuery(request.query);
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     const countResult = await client.query(
       `SELECT count(*)::int AS total
@@ -163,6 +162,7 @@ adminRouter.get('/members', async (request, response, next) => {
     );
     const total = countResult.rows[0].total;
     const totalPages = Math.max(1, Math.ceil(total / MEMBERS_PAGE_SIZE));
+    const page = Math.min(requestedPage, totalPages);
     const offset = (BigInt(page) - 1n) * BigInt(MEMBERS_PAGE_SIZE);
     const memberResult = await client.query(
       `SELECT u.id::text AS id, p.nickname, p.avatar_id AS "avatarId", u.email_normalized AS email,
@@ -178,9 +178,7 @@ adminRouter.get('/members', async (request, response, next) => {
     await client.query('COMMIT');
     sendSuccess(response, {
       items: memberResult.rows.map((member) => ({
-        id: member.id,
         userId: member.id,
-        nickname: member.nickname,
         username: member.nickname,
         avatarId: member.avatarId,
         email: member.email,
@@ -201,11 +199,17 @@ adminRouter.get('/members', async (request, response, next) => {
 });
 
 adminRouter.get('/members/:id', async (request, response, next) => {
+  const client = await pool.connect();
   try {
-    const member = await readMemberDetails(pool, parseMemberId(request.params.id));
+    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    const member = await readMemberDetails(client, parseMemberId(request.params.id));
+    await client.query('COMMIT');
     sendSuccess(response, member);
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     next(error);
+  } finally {
+    client.release();
   }
 });
 

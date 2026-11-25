@@ -1,52 +1,35 @@
 import 'dotenv/config';
-import express from 'express';
-import { pool, closePool } from './db/pool.js';
-import { requestContext, notFound, errorHandler } from './middleware/error-handler.js';
-import { HttpError } from './lib/http-error.js';
-import { sendSuccess } from './lib/api-response.js';
-import { authRouter } from './routes/auth.js';
-import { adminRouter } from './routes/admin.js';
-import { adminQuestionsRouter } from './routes/admin-questions.js';
-import { progressRouter } from './routes/progress.js';
-import { skillsRouter } from './routes/skills.js';
-import { requireSameOrigin } from './middleware/require-same-origin.js';
-import { corsAllowlist } from './middleware/cors.js';
+import { closePool } from './db/pool.js';
+import { runtimeConfig } from './lib/runtime-config.js';
+import { app } from './app.js';
 import { validateEmailRuntime } from './services/email-service.js';
 
-const app = express();
-app.disable('x-powered-by');
-app.use(requestContext);
-app.use('/api', corsAllowlist);
-app.use('/api', requireSameOrigin);
-app.use(express.json({ limit: '1mb' }));
-
-app.get('/api/health', async (_request, response, next) => {
-  try {
-    await pool.query('SELECT 1');
-    sendSuccess(response, { status: 'ok', database: 'connected' });
-  } catch {
-    next(new HttpError(503, 'DATABASE_UNAVAILABLE', '資料庫暫時無法連線'));
-  }
+validateEmailRuntime();
+const server = app.listen(runtimeConfig.port, () => {
+  console.log(`Skill Tree API listening on http://localhost:${runtimeConfig.port}`);
 });
 
-app.use('/api', authRouter);
-app.use('/api', progressRouter);
-app.use('/api', skillsRouter);
-app.use('/api/admin/questions', adminQuestionsRouter);
-app.use('/api/admin', adminRouter);
-app.use('/api', notFound);
-app.use(errorHandler);
-
-const port = Number(process.env.PORT || 3000);
-validateEmailRuntime();
-const server = app.listen(port, () => console.log(`Skill Tree API listening on http://localhost:${port}`));
-
+let shutdownPromise;
 async function shutdown(signal) {
+  if (shutdownPromise) return shutdownPromise;
   console.log(`${signal} received; shutting down gracefully`);
-  server.close(async () => {
-    await closePool();
-    process.exit(0);
+  shutdownPromise = new Promise((resolve) => {
+    server.close(async (error) => {
+      try {
+        await closePool();
+      } catch (closeError) {
+        console.error('Failed to close PostgreSQL pool:', closeError.message);
+        process.exitCode = 1;
+      }
+      if (error) {
+        console.error('Failed to close HTTP server:', error.message);
+        process.exitCode = 1;
+      }
+      resolve();
+    });
+    server.closeIdleConnections?.();
   });
+  return shutdownPromise;
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'));

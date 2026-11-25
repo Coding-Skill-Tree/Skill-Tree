@@ -1,4 +1,4 @@
-// 建立角色頁的靜態資料（第一階段不串 API）。
+// 建立角色頁的文字、路徑和角色選項。
 // id 對應規格的 avatar-01～avatar-06；角色只差在外觀，不影響任何數值。
 
 import avatar01 from "../assets/avatars/avatar-01.svg";
@@ -12,7 +12,8 @@ export const SITE_NAME = "Skill Tree";
 
 export const ROUTES = {
   home: "/",
-  learn: "/learn",
+  login: "/login",
+  learn: "/skillmap",
 };
 
 export const PAGE_TEXT = {
@@ -26,6 +27,8 @@ export const PAGE_TEXT = {
   submitLabel: "開始冒險",
   submittingLabel: "建立中…",
   disabledHint: "輸入暱稱並選擇一個角色後，就可以開始冒險",
+  submitFailed: "角色建立失敗，請確認網路後再試一次。",
+  learnLabel: "前往技能樹",
 };
 
 // 角色圖片：assets/avatars 裡的 SVG 檔（12×12 像素圖），檔名就是 avatar id。
