@@ -10,12 +10,15 @@
   /* 文字 */
   --color-text: #f2f4ed;
   --color-text-muted: #a6ae9d;
+  --color-text-subtle: #929b89;
 
   /* 主題色 */
   --color-primary: #c6f36a;
+  --color-primary-strong: #9bcb45;
   --color-accent: #ebcb72;
 
   /* 狀態色 */
   --color-danger: #f07872;
   --color-info: #8fc7d1;
+
 }

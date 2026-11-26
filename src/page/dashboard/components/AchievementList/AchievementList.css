@@ -1,18 +1,99 @@
 /* Earned achievement cards and acquisition details. */
-.achievement-count { color: var(--color-accent); font-size: 13px; white-space: nowrap; }
-.achievement-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
-.achievement-card { display: flex; align-items: center; gap: 13px; min-width: 0; padding: 15px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-raised); }
-.achievement-icon { display: grid; flex: 0 0 auto; width: 42px; height: 42px; place-items: center; border: 1px solid #ebcb7245; border-radius: 12px; color: var(--color-accent); background: #ebcb7212; font-size: 20px; }
-.achievement-card > div { min-width: 0; }
-.achievement-card strong { font-size: 14px; }
-.achievement-card p { margin: 4px 0; color: var(--color-text-muted); font-size: 12px; }
-.achievement-card small { color: var(--color-text-muted); font-size: 11px; }
+.achievement-count {
+  color: var(--color-accent);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.achievement-wrapper {
+  position: relative;
+  max-height: 250px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.achievement-wrapper::after {
+  content: "";
+  width: 100%;
+  height: 60px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(to bottom, transparent, var(--color-surface));
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.achievement-wrapper.at-bottom::after {
+  opacity: 0;
+}
+
+.achievement-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-raised);
+}
+.achievement-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #ebcb7245;
+  border-radius: 12px;
+  color: var(--color-accent);
+  background: #ebcb7212;
+  font-size: 20px;
+}
+.achievement-card > div {
+  min-width: 0;
+}
+.achievement-card strong {
+  font-size: 18px;
+}
+.achievement-card p {
+  margin: 4px 0;
+  color: var(--color-text-muted);
+  font-size: 15px;
+}
+.achievement-card small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.panel-bottom.achievement-list {
+  justify-content: flex-end;
+  gap: 20px;
+}
+
+.empty-achievement {
+  display: grid;
+  color: var(--color-text-muted);
+}
 
 /* Use two cards per row on tablet and one per row on small phones. */
 @media (max-width: 940px) {
-  .achievement-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .achievement-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 639px) {
-  .achievement-grid { grid-template-columns: 1fr; }
+  .achievement-grid {
+    grid-template-columns: 1fr;
+  }
 }
