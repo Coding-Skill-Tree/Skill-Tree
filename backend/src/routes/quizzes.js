@@ -225,3 +225,144 @@ quizzesRouter.post(
     }
   },
 );
+
+// ===========================================================================
+
+quizzesRouter.get(
+  "/quizzes/attempts/:attemptId",
+  requireMember,
+
+  async (request, response, next) => {
+    let client;
+    let transactionStarted = false;
+    let discardClient = false;
+
+    try {
+      const attemptId = request.params.attemptId;
+      const userId = request.member.id;
+      const uuidPattern =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidPattern.test(attemptId)) {
+        throw validationError({
+          attemptId: "attemptId 格式不正確",
+        });
+      }
+      client = await pool.connect();
+      await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+      transactionStarted = true;
+
+      const attemptResult = await client.query(
+        `SELECT id AS "attemptId",
+        skill_id AS "skillId",
+        total_questions AS "totalCount",
+        status
+        FROM quiz_attempts
+        WHERE id = $1
+        AND user_id = $2`,
+        [attemptId, userId],
+      );
+
+      if (attemptResult.rows.length === 0) {
+        throw new HttpError(404, "ATTEMPT_NOT_FOUND", "找不到此測驗");
+      }
+      const attempt = attemptResult.rows[0];
+      if (attempt.status === "cancelled") {
+        throw new HttpError(404, "ATTEMPT_NOT_FOUND", "找不到此測驗");
+      }
+
+      const questionResult = await client.query(
+        `SELECT question_id::text AS "questionId",
+        ordinal,
+        prompt_snapshot AS "prompt",
+        choices_snapshot AS "choices",
+        answer_mode_snapshot AS "answerMode",
+        selected_choices AS "selectedChoices",
+        correct_choices_snapshot AS "correctChoices",
+        choice_explanations_snapshot AS "choiceExplanations",
+        explanation_snapshot AS "explanation",
+        answered_at AS "answeredAt"
+        FROM quiz_attempt_questions
+        WHERE attempt_id = $1
+        ORDER BY ordinal ASC`,
+        [attemptId],
+      );
+      const isOrdinalValid = questionResult.rows.every(
+        (question, index) => question.ordinal === index + 1,
+      );
+      if (
+        questionResult.rows.length !== attempt.totalCount ||
+        attempt.totalCount !== 5 ||
+        !isOrdinalValid
+      ) {
+        throw new HttpError(500, "INTERNAL_ERROR", "暫時無法取得測驗資料");
+      }
+
+      await client.query("COMMIT");
+      transactionStarted = false;
+
+      const questions = questionResult.rows.map((question) => {
+        const isAnswered = question.answeredAt != null;
+        let answer = null;
+
+        if (isAnswered) {
+          const isSelectedValid =
+            Array.isArray(question.selectedChoices) &&
+            question.selectedChoices.length === 1 &&
+            [0, 1, 2].includes(question.selectedChoices[0]);
+          const isCorrectValid =
+            Array.isArray(question.correctChoices) &&
+            question.correctChoices.length === 1 &&
+            [0, 1, 2].includes(question.correctChoices[0]);
+          if (!isSelectedValid || !isCorrectValid) {
+            throw new HttpError(500, "INTERNAL_ERROR", "暫時無法取得測驗資料");
+          }
+          const isCorrect =
+            question.selectedChoices[0] === question.correctChoices[0];
+
+          answer = {
+            selectedChoices: question.selectedChoices,
+            isCorrect: isCorrect,
+            correctChoices: question.correctChoices,
+            choiceExplanations: question.choiceExplanations,
+            explanation: question.explanation,
+          };
+        }
+        return {
+          questionId: question.questionId,
+          questionIndex: question.ordinal - 1,
+          prompt: question.prompt,
+          answerMode: question.answerMode,
+          choices: question.choices,
+          answer,
+        };
+      });
+      const answeredCount = questions.filter(
+        (question) => question.answer !== null,
+      ).length;
+      sendSuccess(response, {
+        attemptId: attempt.attemptId,
+        skillId: attempt.skillId,
+        totalCount: attempt.totalCount,
+        passingScore: 80,
+        status: attempt.status,
+        answeredCount: answeredCount,
+        questions: questions,
+      });
+    } catch (error) {
+      if (client && transactionStarted) {
+        try {
+          await client.query("ROLLBACK");
+          transactionStarted = false;
+        } catch (rollbackError) {
+          console.error("Quiz transaction rollback failed:", rollbackError);
+          discardClient = true;
+        }
+      } else if (client) {
+        discardClient = true;
+      }
+      next(error);
+    } finally {
+      client?.release(discardClient);
+    }
+  },
+);
