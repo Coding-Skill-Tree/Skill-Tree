@@ -5,16 +5,25 @@ function QuizAnswerList() {
     {
       id: 1,
       questionText: "頁面主要內容應該要放在哪個語意標籤？",
-      userAnswer: "<aside>",
-      correctAnswer: "<main>",
-      explanation: "main 標籤用來表示網頁的主要內容。",
-    },
-    {
-      id: 2,
-      questionText: "哪個標籤用來建立超連結？",
-      userAnswer: "<a>",
-      correctAnswer: "<a>",
-      explanation: "a 標籤用來建立超連結。",
+      userAnswer: "B",
+      correctAnswer: "A",
+      options: [
+        {
+          id: "A",
+          text: "<main>",
+          explanation: "代表網頁的主要內容。",
+        },
+        {
+          id: "B",
+          text: "<aside>",
+          explanation: "代表補充內容或側邊欄。",
+        },
+        {
+          id: "C",
+          text: "<footer>",
+          explanation: "代表網頁的頁尾資訊。",
+        },
+      ],
     },
   ];
   return (
@@ -27,7 +36,7 @@ function QuizAnswerList() {
           questionText={question.questionText}
           userAnswer={question.userAnswer}
           correctAnswer={question.correctAnswer}
-          explanation={question.explanation}
+          options={question.options}
         />
       ))}
     </div>

@@ -1,4 +1,4 @@
-import { HttpError } from './http-error.js';
+import { validationError } from './http-error.js';
 
 export function normalizeEmail(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -14,9 +14,7 @@ export function isValidPassword(value) {
 
 export function validateNewPassword(password, field = 'newPassword') {
   if (isValidPassword(password)) return;
-  throw new HttpError(400, 'VALIDATION_ERROR', '表單內容有誤', {
-    fields: { [field]: '密碼需為 8 到 25 個字，且包含英文字母與數字' },
-  });
+  throw validationError({ [field]: '密碼需為 8 到 25 個字，且包含英文字母與數字' });
 }
 
 export function validateRegistration(email, password) {
@@ -26,7 +24,7 @@ export function validateRegistration(email, password) {
     fields.password = '密碼需為 8 到 25 個字，且包含英文字母與數字';
   }
   if (Object.keys(fields).length) {
-    throw new HttpError(400, 'VALIDATION_ERROR', '表單內容有誤', { fields });
+    throw validationError(fields);
   }
 }
 
@@ -43,6 +41,6 @@ export function validateLogin(email, password, username = false) {
     fields.password = '請輸入密碼';
   }
   if (Object.keys(fields).length) {
-    throw new HttpError(400, 'VALIDATION_ERROR', '表單內容有誤', { fields });
+    throw validationError(fields);
   }
 }
