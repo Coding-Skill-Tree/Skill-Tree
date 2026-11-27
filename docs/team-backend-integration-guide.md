@@ -2,7 +2,7 @@
 
 > **文件狀態：**依 2026-11-28 的遠端 GitHub、Discord 小組聊天室、專案通知郵件與 E integration PR #94 核對。私人信箱和聊天室只作為發布進度來源；本文件沒有代任何組員發訊息。
 >
-> **版本核對：**遠端 `main` 最新 SHA 為 `c814544`（PR #92 merge commit）。E integration 已推送至 [Draft PR #94](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/94)，目前 head 為 `3120f31`；分支保留 PR #90 SkillMap、PR #91 會員 UI、PR #92 dashboard／mock XP 變更。C 的 [PR #93](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/93) 仍未合併。本文件與 E 端程式碼都屬於 PR #94。
+> **版本核對：**遠端 `main` 最新 SHA 為 `c814544`（PR #92 merge commit）。E integration 已推送至 [Draft PR #94](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/94)；分支保留 PR #90 SkillMap、PR #91 會員 UI、PR #92 dashboard／mock XP 變更。C 的 [PR #93](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/93) 仍未合併。本文件與 E 端程式碼都屬於 PR #94；請以 PR 頁面顯示的 head SHA 為準。
 >
 > **適用對象：**本專案五位組員 A、B、C、D、E；E 負責此 PR，跨模組協作者為 A–D。
 > **使用順序：**先看「版本與完成狀態」，再依「快速開始」啟動服務，最後按模組流程串接和驗收。
