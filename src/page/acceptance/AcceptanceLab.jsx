@@ -185,7 +185,7 @@ const STEPS = [
     id: "e03",
     issue: "P2-E-03",
     title: "會員驗證與 Session",
-    description: "驗證會員與管理員身份由 HttpOnly Session cookie 決定，並檢查重設連結錯誤回應。",
+    description: "驗證會員與管理員身份由 HttpOnly Session cookie 決定，並檢查重設驗證碼錯誤回應。",
     checks: [
       {
         id: "member-session",
@@ -209,23 +209,23 @@ const STEPS = [
         },
       },
       {
-        id: "reset-token",
-        title: "重設連結驗證",
+        id: "reset-code",
+        title: "重設驗證碼",
         method: "POST",
         path: "/api/auth/reset-password/verify",
-        expected: "隨機無效 token 回 HTTP 400 INVALID_OR_EXPIRED_TOKEN。",
+        expected: "無效六位數驗證碼回 HTTP 400 INVALID_OR_EXPIRED_CODE。",
         run: async () => {
           const result = await requestJson("/api/auth/reset-password/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: "acceptance-invalid-token" }),
+            body: JSON.stringify({ email: "acceptance@example.test", code: "000000" }),
           });
           const ok = result.response.status === 400
-            && isErrorEnvelope(result.body, "INVALID_OR_EXPIRED_TOKEN");
+            && isErrorEnvelope(result.body, "INVALID_OR_EXPIRED_CODE");
           return checkFromResponse({
             ...result,
             expected: ok,
-            summary: ok ? "無效連結以通用錯誤回覆，測試沒有使用或消耗真實 token。" : "重設連結回應不符合預期。",
+            summary: ok ? "無效驗證碼以通用錯誤回覆；驗收只使用不存在的測試 Email。" : "重設驗證碼回應不符合預期。",
             path: "/api/auth/reset-password/verify",
           });
         },

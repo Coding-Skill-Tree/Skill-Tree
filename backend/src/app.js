@@ -5,14 +5,16 @@ import { pool } from './db/pool.js';
 import { HttpError } from './lib/http-error.js';
 import { sendSuccess } from './lib/api-response.js';
 import { requestContext, notFound, errorHandler } from './middleware/error-handler.js';
+import { apiRateLimit } from './middleware/api-rate-limit.js';
+import { securityHeaders } from './middleware/security-headers.js';
 import { requireSameOrigin } from './middleware/require-same-origin.js';
 import { corsAllowlist } from './middleware/cors.js';
+import { runtimeConfig } from './lib/runtime-config.js';
 import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { adminQuestionsRouter } from './routes/admin-questions.js';
 import { progressRouter } from './routes/progress.js';
 import { skillsRouter } from './routes/skills.js';
-import { quizzesRouter } from './routes/quizzes.js';
 import { devWorkbenchRouter } from './routes/dev-workbench.js';
 
 const openApiDocument = JSON.parse(readFileSync(new URL('../openapi.json', import.meta.url), 'utf8'));
@@ -21,10 +23,13 @@ const apiDocsDirectory = fileURLToPath(new URL('../docs-ui', import.meta.url));
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', runtimeConfig.trustProxyHops);
   app.use(requestContext);
+  app.use(securityHeaders);
   app.use('/api', corsAllowlist);
+  app.use('/api', apiRateLimit);
   app.use('/api', requireSameOrigin);
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '64kb' }));
 
   app.get('/api/health', async (_request, response, next) => {
     try {
@@ -44,7 +49,6 @@ export function createApp() {
   app.use('/api', authRouter);
   app.use('/api', progressRouter);
   app.use('/api', skillsRouter);
-  app.use('/api', quizzesRouter);
   app.use('/api/admin/questions', adminQuestionsRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api', notFound);

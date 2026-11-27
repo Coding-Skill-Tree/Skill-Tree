@@ -33,6 +33,27 @@ test('production requires HTTPS origins', () => {
   assert.match(result.stderr, /正式環境的 APP_ORIGINS 必須使用 HTTPS/u);
 });
 
+test('production requires database TLS', () => {
+  const result = loadConfig({
+    NODE_ENV: 'production',
+    APP_ORIGINS: 'https://skill.example.test',
+    DATABASE_SSL: 'false',
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /正式環境必須設定 DATABASE_SSL=true/u);
+});
+
+test('production requires a high-entropy email-code secret', () => {
+  const result = loadConfig({
+    NODE_ENV: 'production',
+    APP_ORIGINS: 'https://skill.example.test',
+    DATABASE_SSL: 'true',
+    EMAIL_CODE_SECRET: 'too-short',
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /至少 32 個字元的 EMAIL_CODE_SECRET/u);
+});
+
 test('origin entries cannot include paths', () => {
   const result = loadConfig({ APP_ORIGINS: 'http://localhost:5173/admin' });
   assert.notEqual(result.status, 0);

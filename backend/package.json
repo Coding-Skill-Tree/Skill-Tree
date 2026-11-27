@@ -11,6 +11,7 @@
     "db:qa-fixtures": "node scripts/qa-fixtures.js",
     "db:qa-fixtures:clean": "node scripts/qa-fixtures-clean.js",
     "admin:create": "node scripts/admin-create.js",
+    "admin:transfer-owner": "node scripts/admin-transfer-owner.js",
     "db:question-coverage": "node scripts/question-coverage.js",
     "test:api": "node scripts/test-api.js"
   },

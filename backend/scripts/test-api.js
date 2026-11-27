@@ -49,6 +49,9 @@ const environment = {
   ...process.env,
   NODE_ENV: 'test',
   DATABASE_URL: testDatabaseUrl,
+  DATABASE_MIGRATION_URL: testDatabaseUrl,
+  API_RATE_LIMIT_REQUESTS: '10000',
+  AUTH_RATE_LIMIT_REQUESTS: '10000',
   APP_ORIGINS: process.env.APP_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173',
 };
 

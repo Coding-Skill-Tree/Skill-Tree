@@ -11,7 +11,11 @@ try {
   const coverage = await getPublishedQuestionCoverage(pool, minimumPerSkill);
   for (const skill of coverage.skills) {
     const result = skill.meetsMinimum ? 'OK' : 'MISSING';
-    console.log(`${result}\t${skill.skillId}\t${skill.publishedQuestionCount}/${coverage.minimumPerSkill}`);
+    console.log(
+      `${result}\tC_ELIGIBLE=${skill.cQuizEligibleQuestionCount}/${coverage.cQuizMinimum}\t${skill.skillId}`
+      + `\tpublished=${skill.publishedQuestionCount}/${coverage.minimumPerSkill}`
+      + `\tcQuiz3Single=${skill.cQuizEligibleQuestionCount}/${coverage.cQuizMinimum}`,
+    );
   }
   if (!coverage.activeSkillCount) {
     console.error('Question bank coverage failed: no active skills were found.');
@@ -20,7 +24,8 @@ try {
     console.error('Question bank coverage failed: add approved, published, non-demo questions for each active skill.');
     process.exitCode = 1;
   } else {
-    console.log(`Question bank coverage ready for ${coverage.activeSkillCount} active skills.`);
+    console.log(`General question bank coverage meets ${coverage.minimumPerSkill} published questions for all ${coverage.activeSkillCount} active skills.`);
+    console.log(`C v1 requires ${coverage.cQuizMinimum} eligible questions per MVP skill; the five MVP skill IDs still need confirmation.`);
   }
 } catch (error) {
   console.error('Question bank coverage check failed:', error.message);

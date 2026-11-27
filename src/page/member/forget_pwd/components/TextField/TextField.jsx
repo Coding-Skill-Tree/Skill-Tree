@@ -16,6 +16,7 @@ function TextField({
   hint,
   placeholder,
   autoComplete,
+  inputMode,
   disabled = false,
   inputRef,
   trailing,
@@ -37,6 +38,7 @@ function TextField({
           value={value}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          inputMode={inputMode}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}

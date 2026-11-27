@@ -1,31 +1,43 @@
-# C 測驗 API 與共用後端整合紀錄
+# C 測驗 API 與 E 共用後端對齊
 
-本文記錄本分支對 C [PR #86](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/86) 的差異和整合選擇。PR #86 的原始分支未被直接 merge 或改寫；本分支把建立／取題功能依共用後端架構移植並調整，應由 C 再 review 一次。
+本文件依 2026-11-28 的遠端狀態整理。C 的 [PR #93](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/93) 仍未合併；E 分支不複製 C 的 `quizzes.js` router。C 的 router、抽題 helper 和靜態教材資料仍由 C 的 PR 維護。E 提供合併後所需的 migration、CORS header、題庫查詢／可用性服務、完成紀錄、XP Outbox 和學習歷史投影。
 
-## 差異與處理方式
+## PR #93 與 E 分支的界線
 
-| PR #86 原始實作 | 本分支處理 | 原因 |
+| 項目 | C PR #93 | E 提供／對齊結果 |
 | --- | --- | --- |
-| `server.js` 自行建立 Express app 和註冊所有 routes。 | 在 `backend/src/routes/quizzes.js` 實作 router，從共用 `backend/src/app.js` 註冊；保留現有 `server.js` 啟動器。 | 一個 Express app 統一使用 request ID、CORS、origin 檢查、錯誤 envelope 和其他共用 routes。 |
-| 建立 attempt 未寫 `skill_title_snapshot`。 | 同一 transaction 讀取 active skill title，寫入 `skill_title_snapshot`，空標題以 skill ID 作快照值。 | migration 010 將欄位設為 `NOT NULL`，也要維持舊測驗顯示名稱。 |
-| 沒有 `Idempotency-Key` 和 fingerprint。 | 強制 UUID header，依正規化 `{ skillId }` JSON 的 UTF-8 bytes 產生 SHA-256；以會員和 key 唯一。相同請求回原 attempt，不同請求回 `409 IDEMPOTENCY_KEY_REUSED`。 | 網路逾時後重試不能意外新增第二筆測驗；與 migration 010 和 API 契約一致。 |
-| 只接受單選、3 個選項，並將正確索引限制在 0–2。 | 使用現有正式題庫 service；支援 schema 中 2–10 個選項、單選／多選和索引快照。 | 題庫 migration 008 已支援多選與 2–10 個選項。 |
-| 題庫數量少於 8 道時拒絕建立。 | 目前依 API 契約以 5 道正式可用題為最低值，建立 5 題 attempt。 | 契約和 `db:question-coverage` 使用 5；C PR #86 的 8 道可用題門檻尚未由 B/C/E 確認。若決定提高門檻，需同步改契約、route、Explorer 和測試。 |
-| GET 在某題已作答時回 `correctChoices` 和解析，即使 attempt 還在 `in_progress`。 | learner response 僅讀 prompt、choices、answer mode、selected choices 和 answered time；永不從這支 query 讀正解或解析欄位。 | 防止會員在測驗尚未完成前取得答案。結果應由完成後的 result endpoint 提供。 |
-| 建新測驗前刪除舊的進行中測驗。 | 保留舊 attempt；新建 attempt 不做破壞性刪除。 | 保留測驗歷史與原本 idempotency key 的重送結果。 |
-| 使用硬編碼、唯一為 draft 的 `tutorials.js` 判定教材可否測驗。 | 移除該靜態 gate，改用共用 DB 的 active skill、先修條件和正式已發布題庫判定。 | 該檔不是共享課程目錄且目前資料為 draft，會讓其他技能永遠無法開始；日後若要檢查教材狀態，應由共用資料來源提供。 |
+| 開始測驗、隨機取五題、建立快照 | C-owned router；目前在 PR branch，尚未進入 E app | E migration 010 建立 `skill_title_snapshot NOT NULL`、Idempotency 欄位及唯一索引 |
+| `Idempotency-Key` | C 驗 UUID、fingerprint、同會員鎖與重試 | E CORS allowlist 允許 `Idempotency-Key`；說明見[冪等鍵指南](idempotency-key-guide.md) |
+| 題庫條件 | C 現在於 router 自行寫 SQL | E 提供 `listPublishedQuestionsForSkill()` 和 `getQuizAvailability()`，讓 C route 與技能畫面共用 eligibility 規則 |
+| 教材 ready | C PR 使用 `tutorials.js` 的 `isTutorialReady()` | 共用 schema 目前沒有 lesson-ready 欄位；E 的可用性以 active skill、先修完成和符合規格的正式題庫數為準。若產品需要教材狀態，需先訂資料來源／欄位再整合 |
+| 永久通過／XP | C 負責在完成測驗時呼叫 | E 提供 backend-only `recordSkillCompletion()`、`enqueueSkillFirstPassXpEvent()`；同一 transaction 使用同一 DB client |
+| 學習歷史 | C 讀取完成測驗歷史 | E `GET /api/progress/history` 從 `user_learning_activity_history` 投影讀取 |
+| 作答與結算 | #93 diff 沒有答案提交或結果 route | 尚未提供。這不會由 E 的建立／讀題依賴取代 |
 
-## 已接入的行為
+## 需要在合併前對齊的項目
 
-- `POST /api/quizzes/attempts`：會員 session、active skill、先修條件、正式題庫篩選、五題不重複抽取、技能名稱 snapshot、migration 010 冪等鍵與單一 transaction。
-- `GET /api/quizzes/attempts/:attemptId`：檢查 UUID 和會員所有權；同一會員可讀取題目快照；不存在或非本人資源一致回 404。
-- JSON response 使用共用 `sendSuccess()`；驗證和衝突沿用 `validationError()`／`HttpError`；DB 使用既有 pool 和 repository service。
-- API Explorer 可輸入 OpenAPI 定義的 request header，才能實際送出建立測驗要求的 `Idempotency-Key`。
-- 前端 `src/services/quizzes.js` 提供安全 UUID 產生、建立和讀取 adapter；重試沿用同一 key。
+1. **把靜態教材 gate 換成共用可用性判斷。** C PR 的 `tutorials.js` 目前只有一筆 `status: "draft"`，`isTutorialReady()` 只接受 `published`，因此該技能也會被擋在 `409 TUTORIAL_NOT_READY`；其他技能不存在於這張靜態表。C 可在建立 route 的 transaction 中呼叫 E 的 `getQuizAvailability(client, { userId, skillId })`，再以 `listPublishedQuestionsForSkill(client, skillId)` 取得 server-only 的正式題庫。若仍需要課程 ready gate，請先讓該欄位有正式 DB/API 來源。
+2. **快照欄位相容。** migration 010 對舊資料以技能標題（空白時退回 `skill_id`）回填，之後設 `NOT NULL`；C 建立新 attempt 時需提供非空 `skill_title_snapshot`。C PR #93 已寫入此欄位。
+3. **統一錯誤碼與取消重試。** C PR 實際回 `409 IDEMPOTENCY_KEY_CONFLICT`（同 key 不同本文）。相同 key 的 attempt 若後來已取消，重送會回原 attempt（`200`，`status: "cancelled"`），不建立新 attempt；讀取已取消 attempt 回 `404 ATTEMPT_NOT_FOUND`。新一場需新 key。
+4. **維持答案隔離。** C router 的讀題 response 不應包含正解和解析；正解只保留於 DB snapshot 及可信任 server code。PR #93 尚未包含 answer submit/result route，前端不可把它們視為已可呼叫。
+5. **接上共同 Express。** E 的 `backend/src/app.js` 不註冊 C router，直到 C PR 合併或另行取得整合版 router；CORS、body parser、request ID、標準錯誤和 E migration 都需在同一 app／測試 DB 驗證。
 
-## 待 C／團隊確認或完成
+## E 提供的可用性 API
 
-- 請 C review 本分支的資料形狀、先修行為和 5／8 題門檻差異；目前程式選用既有共用契約 5 題門檻，尚未把 C 的 8 題想法視為正式決策。
-- 答案提交、完成結算、結果讀取和測驗歷史 HTTP routes 尚未實作。`recordSkillCompletion()` 和 XP event enqueue 仍需在後續 C completion transaction 中接入。
-- 本分支測試新增了 C 建題／取題整合情境，但本機目前沒有 `TEST_DATABASE_URL`，尚未在隔離 PostgreSQL 上執行整合測試。純抽題與工作台安全邊界測試可獨立執行。
-- 不因建立／讀取 API 已存在就關閉 C 或 E Issue，也不代表 B/C/D 畫面已端到端串接。
+`GET /api/skills/{skillId}/quiz-availability` 需會員 session，只回可否開始、原因、缺少的先修技能 ID、符合 C v1 規格的可用題數和最低需求數。它不會回傳題目或答案。這個 GET 方便 B 的技能地圖顯示「可開始／被先修鎖定／正式題數不足」；開始測驗的 POST 仍必須在自己的 transaction 內重驗，不能信任前端先前取得的 GET 結果。
+
+Eligibility 條件為：技能與分類啟用；先修技能已由目前會員完成；題目為已啟用、已發布、未刪除、非 demo、單選、三個選項、一個合法正解，且題幹／選項／解析完整；至少五題才可開始。此服務不推斷教材已完成或已發布，因為目前共用 schema 沒有這項狀態。
+
+管理員題庫 API 可回正解，但只接受管理員 session。`listPublishedQuestionsForSkill()` 是 backend-only service，回傳正解給可信任的 C route 判分，不是瀏覽器 API。
+
+## 完成測驗與歷史
+
+C 的答案與結算流程完成後，應在同一 transaction 鎖定 attempt、驗證 owner／ordinal、從 DB 快照判分、只結算一次；若首次通過，再呼叫 `recordSkillCompletion(client, { userId, skillId, attemptId })` 與 `enqueueSkillFirstPassXpEvent(client, { userId, skillId, attemptId })`。`userId` 必須來自 `request.member.id`，不得來自 request body。
+
+完成後，歷史由 `GET /api/progress/history?skillId=<skillId>&limit=10` 取得。它只列已完成測驗，不包括 cancelled 或 in-progress attempt，也不新增第二份 C 專用歷史資料表。
+
+## 驗收狀態
+
+- C PR #93 描述其獨立 PostgreSQL 環境通過 97 項回歸測試；那不是 E 最新 main 分支的 live 整合結果。
+- E branch 的整合驗收需在隔離 `TEST_DATABASE_URL` 上套用完整 migrations，並以同一 `app.js` 驗證 C route、CORS 預檢、冪等競態、題目 snapshot、會員隔離、完成進度、history 與 XP outbox。
+- 沒有安全的 TEST_DATABASE_URL 時，不可用正式或私人資料庫代替，也不應宣稱 live DB 驗收已通過。

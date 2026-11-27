@@ -2,7 +2,7 @@
 
 本專案提供兩個目的不同的本機工具：
 
-- `/workbench`：用資料流視覺圖、OpenAPI、migration 狀態和白名單原始碼，理解「畫面呼叫哪支 API、後端在哪裡處理、資料如何進資料庫」。此頁只送 GET。
+- `/workbench`：用資料流視覺圖、OpenAPI、migration 狀態和白名單原始碼，理解「畫面呼叫哪支 API、後端在哪裡處理、資料如何進資料庫」。此頁只送 GET。測驗區會明示 C PR #93 尚未合併／掛載，不會把計畫中的路由列成可用 API。
 - `/api/docs`：互動式 API Explorer，可實際呼叫 OpenAPI 中列出的端點。POST、PUT、PATCH、DELETE 和登入請求可能改變本機資料或建立 session。
 
 前端 UI 和後端 repo 都以程式碼為準；工作台提供導覽與可查證的本機狀態，不會取代程式碼 review、API 測試或真實模組驗收。
@@ -26,7 +26,7 @@
 | Migration 狀態 | `GET /api/dev/workbench/status` | 顯示 `schema_migrations` 的檔名和套用時間，不回 checksum 或業務資料。 |
 | 原始碼 | `GET /api/dev/workbench/sources/:sourceId` | 只讀固定白名單中的特定檔案；畫面使用文字節點顯示程式碼。 |
 
-白名單包含前端 API client／測驗 adapter、工作台 UI、Express app、測驗 routes、題庫 service、學習歷史 route、migration 010 和 API 契約。工作台沒有任意 filepath 參數，也不提供任意 SQL、會員記錄、session、環境變數或密碼讀取。
+白名單包含前端登入／註冊畫面、API client 和會員 adapter、C 測驗 adapter、Express app、目前已掛載的會員／管理員／技能／歷史 routes、session service、驗證碼與題庫 services、XP event producer、migrations 010–012、API 契約、Email 流程文件及 A–D 指南。C 的建立／讀題 router 尚在 PR #93，未掛到此 app；測驗篩選會清楚顯示此狀態。API 清單可切換「會員、目錄與歷史、測驗、管理後台」查看；點選資料流節點可跳到相關來源檔。工作台沒有任意 filepath 參數，也不提供任意 SQL、會員記錄、session、環境變數或密碼讀取。
 
 ## 安全限制
 

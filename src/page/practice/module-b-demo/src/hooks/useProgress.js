@@ -4,15 +4,33 @@ function loadProgress() {
   try { return sanitizeProgress(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')); }
   catch { return {}; }
 }
-export function useProgress() {
-  const [progress, setProgress] = useState(loadProgress);
+export function useProgress({ readOnly = false } = {}) {
+  const [progress, setProgress] = useState(readOnly ? () => ({}) : loadProgress);
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); setStorageError(false); }
-    catch { setStorageError(true); }
-  }, [progress]);
-  const start = useCallback(id => setProgress(previous => startNode(previous, id)), []);
-  const complete = useCallback(id => setProgress(previous => completeNode(previous, id)), []);
-  const reset = useCallback(() => setProgress({}), []);
+    if (readOnly) return;
+    let active = true;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }
+    catch { queueMicrotask(() => { if (active) setStorageError(true); }); }
+    return () => { active = false; };
+  }, [progress, readOnly]);
+  const start = useCallback(id => {
+    if (!readOnly) {
+      setStorageError(false);
+      setProgress(previous => startNode(previous, id));
+    }
+  }, [readOnly]);
+  const complete = useCallback(id => {
+    if (!readOnly) {
+      setStorageError(false);
+      setProgress(previous => completeNode(previous, id));
+    }
+  }, [readOnly]);
+  const reset = useCallback(() => {
+    if (!readOnly) {
+      setStorageError(false);
+      setProgress({});
+    }
+  }, [readOnly]);
   return { progress, storageError, start, complete, reset };
 }

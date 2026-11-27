@@ -29,6 +29,19 @@ function readHistoryLimit(value) {
   return limit;
 }
 
+function readHistorySkillId(value) {
+  if (value === undefined) return null;
+  if (
+    typeof value !== 'string'
+    || value.length === 0
+    || value.length > 80
+    || value !== value.trim()
+  ) {
+    throw validationError({ skillId: '技能 ID 必須是 1 到 80 個字元，且不可包含前後空白' });
+  }
+  return value;
+}
+
 function readHistoryCursor(value) {
   if (value === undefined) return null;
   if (typeof value !== 'string' || value.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(value)) {
@@ -46,19 +59,27 @@ function readHistoryCursor(value) {
       || !isValidHistoryCursorTimestamp(cursor.completedAt)
       || typeof cursor.activityId !== 'string'
       || !HISTORY_CURSOR_UUID.test(cursor.activityId)
+      || (cursor.skillId !== undefined && cursor.skillId !== null
+        && (typeof cursor.skillId !== 'string' || cursor.skillId.length === 0
+          || cursor.skillId.length > 80 || cursor.skillId !== cursor.skillId.trim()))
     ) {
       throw new Error('Invalid cursor fields');
     }
-    return { completedAt: cursor.completedAt, activityId: cursor.activityId };
+    return {
+      completedAt: cursor.completedAt,
+      activityId: cursor.activityId,
+      skillId: cursor.skillId ?? null,
+    };
   } catch {
     throw validationError({ cursor: '分頁游標格式無效' });
   }
 }
 
-function encodeHistoryCursor(item) {
+function encodeHistoryCursor(item, skillId) {
   return Buffer.from(JSON.stringify({
     completedAt: item.completedAtCursor,
     activityId: item.activityId,
+    skillId,
   }), 'utf8').toString('base64url');
 }
 
@@ -92,8 +113,12 @@ progressRouter.get('/progress', requireMember, async (request, response, next) =
 
 progressRouter.get('/progress/history', requireMember, async (request, response, next) => {
   try {
+    const skillId = readHistorySkillId(request.query.skillId);
     const limit = readHistoryLimit(request.query.limit);
     const cursor = readHistoryCursor(request.query.cursor);
+    if (cursor && cursor.skillId !== skillId) {
+      throw validationError({ cursor: '分頁游標必須沿用相同的 skillId 篩選條件' });
+    }
     const result = await pool.query(
       `SELECT activity_id::text AS "activityId", activity_type AS "activityType",
               skill_id AS "skillId", title AS "skillTitle", catalog_version AS "catalogVersion",
@@ -102,10 +127,11 @@ progressRouter.get('/progress/history', requireMember, async (request, response,
               to_char(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "completedAtCursor"
        FROM user_learning_activity_history
        WHERE user_id = $1
-         AND ($2::timestamptz IS NULL OR (completed_at, activity_id) < ($2::timestamptz, $3::uuid))
+         AND ($2::text IS NULL OR skill_id = $2)
+         AND ($3::timestamptz IS NULL OR (completed_at, activity_id) < ($3::timestamptz, $4::uuid))
        ORDER BY completed_at DESC, activity_id DESC
-       LIMIT $4`,
-      [request.member.id, cursor?.completedAt ?? null, cursor?.activityId ?? null, limit + 1],
+       LIMIT $5`,
+      [request.member.id, skillId, cursor?.completedAt ?? null, cursor?.activityId ?? null, limit + 1],
     );
     const hasMore = result.rows.length > limit;
     const rows = result.rows.slice(0, limit);
@@ -124,7 +150,7 @@ progressRouter.get('/progress/history', requireMember, async (request, response,
     }));
     sendSuccess(response, {
       items,
-      nextCursor: hasMore ? encodeHistoryCursor(rows[rows.length - 1]) : null,
+      nextCursor: hasMore ? encodeHistoryCursor(rows[rows.length - 1], skillId) : null,
     });
   } catch (error) {
     next(error);

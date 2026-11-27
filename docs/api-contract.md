@@ -2,7 +2,7 @@
 
 這份文件是 A、B、C、D、E 共用的 API 對齊基準。路由以目前 Express 後端為準；沒有標示「已實作」的端點不得由前端假設存在。
 
-互動式 API Explorer：啟動本機前端及 API 後開啟 [API Explorer](http://localhost:5173/api/docs)；機器可讀的 OpenAPI 3.0 定義在 [backend/openapi.json](../backend/openapi.json)，非 production 環境提供 `/api/openapi.json`。Explorer 直接讀取 OpenAPI，不另維護第二份路由清單；production 不提供 Explorer 或 OpenAPI HTTP 路由。目前已實作測驗建立與題目快照讀取；答案提交、結算與測驗歷史 HTTP routes 仍待 C 完成。題庫寫入和會員停權等 Explorer 操作會修改資料，請只連本機測試資料庫。
+互動式 API Explorer：啟動本機前端及 API 後開啟 [API Explorer](http://localhost:5173/api/docs)；機器可讀的 OpenAPI 3.0 定義在 [backend/openapi.json](../backend/openapi.json)，非 production 環境提供 `/api/openapi.json`。Explorer 直接讀取 OpenAPI，不另維護第二份路由清單；production 不提供 Explorer 或 OpenAPI HTTP 路由。目前已實作測驗建立、題目快照讀取及共用學習歷史查詢；答案提交與測驗結果仍待 C 完成。題庫寫入和會員停權等 Explorer 操作會修改資料，請只連本機測試資料庫。
 
 ## 共通規則
 
@@ -28,7 +28,7 @@
 
 資料庫無法連線時回傳 `503 DATABASE_UNAVAILABLE`。
 
-Schema 以 `backend/migrations/` 中有序遞增且不可回改的 SQL migrations 為唯一來源，目前為 001–010。每位組員使用獨立本機資料庫；migration runner 會鎖定、檢查 checksum，並以 transaction 套用單一 migration。開發基線為 PostgreSQL 17；團隊仍需確認共用 PostgreSQL major version。
+Schema 以 `backend/migrations/` 中有序遞增且不可回改的 SQL migrations 為唯一來源，目前為 001–012。每位組員使用獨立本機資料庫；migration runner 會鎖定、檢查 checksum，並以 transaction 套用單一 migration。開發基線為 PostgreSQL 17；團隊仍需確認共用 PostgreSQL major version。
 
 目前的資料責任對照如下；C、D 的業務規則和寫入流程由該模組負責人確認，E 維護共用 Schema 與 migration，不替其他模組決定業務邏輯。
 
@@ -49,18 +49,20 @@ Schema 以 `backend/migrations/` 中有序遞增且不可回改的 SQL migration
 
 | Method | Path | 認證 | 用途 |
 | --- | --- | --- | --- |
-| POST | `/api/auth/register` | 無 | 註冊；`{email,password}`，成功 `201` |
-| POST | `/api/auth/verify-email` | 無 | 驗證 Email；`{token}` |
+| POST | `/api/auth/register` | 無 | 同交易建立會員、profile、session；`{email,password}`，成功 `201` 設定 `sid` 並回 `nextStep: "/onboarding"` |
+| POST | `/api/auth/verify-email` | 無 | 舊版 Email 驗證連結相容端點；新註冊不再寄送驗證連結 |
 | POST | `/api/auth/login` | 無 | 登入；`{email,password}`，建立 `sid` cookie |
 | POST | `/api/auth/logout` | `sid` 可有可無 | 撤銷目前會員 session，回 `204` |
 | GET | `/api/me` | 會員 | 讀取目前登入會員資料 |
 | POST | `/api/auth/forgot-password` | 無 | 申請密碼重設；對已註冊與未註冊 Email 使用相同訊息 |
-| POST | `/api/auth/reset-password/verify` | 無 | `{token}`；檢查 token 有效性但不消耗，成功 `204` |
-| POST | `/api/auth/reset-password` | 無 | 使用一次性 token 設定新密碼，回 `204` 並撤銷既有 sessions |
+| POST | `/api/auth/reset-password/verify` | 無 | `{email,code}`；檢查六位數驗證碼但不消耗，成功 `204` |
+| POST | `/api/auth/reset-password` | 無 | `{email,code,password}`；驗證碼一次性使用，回 `204` 並撤銷既有 sessions |
 | POST | `/api/auth/change-password` | 會員 | `{currentPassword,newPassword}`；回 `204`，撤銷其他 sessions |
 | PATCH | `/api/me/profile` | 會員 | `{username,avatarId}`；更新目前會員 onboarding profile，成功回傳會員資料 |
 
-會員識別一律來自驗證過的 `sid`。未驗證 Email 不可登入；停權帳號不可登入或使用會員 API。密碼只保存雜湊，session token 只以雜湊保存。
+會員識別一律來自驗證過的 `sid`。新註冊會在建立 user/profile 的同一個 transaction 建立登入 session，成功回應後即可呼叫會員 API 並接續 `/onboarding`；不寄驗證信，另寄歡迎信。舊的未驗證帳號仍可透過成功的密碼重設流程補上 Email 驗證時間。停權帳號不可登入或使用會員 API。密碼只保存雜湊，session token 只以雜湊保存。
+
+忘記密碼回應不揭露 Email 是否註冊；寄送節流為每個 Email 60 秒一次。驗證碼以密鑰 HMAC 儲存，不保存明碼；有效期限 10 分鐘、成功重設後即消耗，每個驗證碼最多 5 次錯誤輸入。production 必須在 secret store 設定至少 32 字元的 `EMAIL_CODE_SECRET`。期限、嘗試次數與寄送節流是 E 的安全實作值，A 可在 review 提出一致性調整。
 
 `POST /api/auth/login` 與 `GET /api/me` 的會員資料欄位一致：`userId`（字串）、`username`（即會員暱稱，可為 `null`）、`email`、`createdAt`、`avatarId`、`route`、`onboardingCompleted`、`hasPassword`。`userId`、`username` 對齊 A 模組第一階段會員 profile API；不要另外建立 `id`／`nickname` 別名。
 
@@ -68,13 +70,15 @@ Schema 以 `backend/migrations/` 中有序遞增且不可回改的 SQL migration
 
 | Method | Path | 認證 | 用途 |
 | --- | --- | --- | --- |
-| POST | `/api/admin/auth/login` | 無 | `{username,password}`；成功建立 `admin_sid` |
-| GET | `/api/admin/me` | 管理員 | 讀取目前管理員 |
+| POST | `/api/admin/auth/login` | 無 | `{username,password}`；成功建立 `admin_sid`，回傳 `role` |
+| GET | `/api/admin/me` | 管理員 | 讀取目前管理員與 `role` |
 | POST | `/api/admin/auth/logout` | `admin_sid` 可有可無 | 撤銷管理員 session，回 `204` |
+| GET | `/api/admin/team` | `owner` | 列出管理員帳號；不回傳密碼雜湊或會員資料 |
+| PATCH | `/api/admin/team/{id}` | `owner` | `{disabled}` 停用／恢復組員；更改管理員角色只允許在可信任主機執行 |
 
-登入失敗使用一致訊息並套用帳號節流；管理員 session 與會員 session 分開保存與驗證。
+管理員角色只有 `owner` 和 `editor`。唯一的 `owner` 是專案最高管理者；`editor` 組員可瀏覽會員和編輯題庫，但不能管理組員帳號。新管理員不提供公開註冊，需在可信任主機執行 `admin:create`。登入失敗使用一致訊息並套用帳號節流；管理員 session 與會員 session 分開保存與驗證。
 
-登入成功與 `GET /api/admin/me` 都回傳 `{ "adminId": "1", "username": "site_admin" }`。管理員 ID 也是十進位字串。
+登入成功與 `GET /api/admin/me` 都回傳 `{ "adminId": "1", "username": "site_admin", "role": "editor" }`。管理員 ID 也是十進位字串。
 
 ### A-09 會員列表（已實作並由共用管理後台整合）
 
@@ -142,6 +146,7 @@ Schema 以 `backend/migrations/` 中有序遞增且不可回改的 SQL migration
 | --- | --- | --- | --- |
 | GET | `/api/skills` | 無 | 讀取啟用中的分類與技能目錄 |
 | GET | `/api/progress` | 會員 | 讀取目前會員完成的技能及版本 |
+| GET | `/api/skills/{skillId}/quiz-availability` | 會員 | 只讀取可否開始 C v1 測驗、原因、缺少的先修 ID 和合格題數；不回題目或正解 |
 
 `GET /api/skills` 回傳 `{catalogVersion,categories,skills}`。每個 skill 的正式識別欄位為 `skillId`，並包含 `categoryId`、`category`、`title`、`description`、`learningItems`、`position:{x,y}`、`catalogVersion`、`sortOrder`、`prerequisiteSkillIds`。
 
@@ -157,31 +162,30 @@ B×C 在 [整合討論 #1](https://github.com/Coding-Skill-Tree/Skill-Tree/issue
 
 管理員題庫端點會回傳正解，只能由管理員 session 呼叫。不得把管理端點改成公開端點，也不得讓瀏覽器在作答前取得正解。C 負責測驗開始、抽題、答案判定、計分與歷史；E 提供 backend-only `listPublishedQuestionsForSkill(database, skillId)`，只回傳已發布、啟用、未刪除、非展示題及其答案給可信任的伺服器程式。C 的 HTTP route 不得將正解欄位回傳給瀏覽器。
 
-正式題庫覆蓋率以每個啟用技能至少 5 道符合上述條件的題目為驗收門檻。`npm run db:question-coverage` 檢查覆蓋率；目前開發 seed 是展示題，不計入正式覆蓋率。正式題目內容由 B/C 確認後提供。
+正式題庫覆蓋率以每個目標技能至少 5 道符合 C 首版規格的題目為驗收門檻：已發布、啟用、未刪除、非展示題、單選、恰好 3 個選項、恰好 1 個正解，且題目與解析完整。`npm run db:question-coverage` 同時列出一般正式題數與 C 首版可用題數；目前開發 seed 是展示題，不計入正式覆蓋率。C 的五個 MVP `skillId` 清單及 ready 標記方式尚待確認，因此不能把所有 active skill 自動當成 MVP 技能。
 
 ### C 測驗 API 與資料規則
 
-建立測驗及取題 routes 已接入共用 Express、API Explorer 和前端 API adapter。答案提交、結算和測驗歷史仍是後續工作；下表中標示「待實作」的 endpoints 不可假設已存在。
+C 的 [PR #93](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/93) 提供建立和讀取測驗 API，但目前仍未合併；E app 不重複實作 C 的 router，也不會在本分支 OpenAPI 假裝端點已掛載。migration 010、CORS `Idempotency-Key`、題庫可用性服務和 history projection 是 E 提供的整合依賴。答案提交與結算 endpoint 尚未出現在 PR #93。
 
-| Method | Path | 認證 | 用途 |
+| Method | Path | 認證 | 實作狀態／用途 |
 | --- | --- | --- | --- |
-| POST | `/api/quizzes/attempts` | 會員 | **已實作**；建立五題 attempt；body `{ skillId }`；必帶 UUID `Idempotency-Key` header |
-| GET | `/api/quizzes/attempts/:attemptId` | 同一會員 | **已實作**；讀取 attempt 及題目快照，不含正解／解析欄位 |
-| POST | `/api/quizzes/attempts/:attemptId/answers` | 同一會員 | **待實作**；儲存一題答案；使用 `{ ordinal, selectedChoices }`，選項索引從 0 起算 |
-| GET | `/api/quizzes/attempts/:attemptId/result` | 同一會員 | **待實作**；讀取已保存結算結果 |
-| GET | `/api/quizzes/history` | 會員 | **待實作**；查自己的所有已完成測驗，支援 keyset pagination |
+| POST | `/api/quizzes/attempts` | 會員 | **C PR #93，尚未合併**；建立 C v1 五題測驗；body `{ skillId }`；必帶 UUID `Idempotency-Key` |
+| GET | `/api/quizzes/attempts/:attemptId` | 同一會員 | **C PR #93，尚未合併**；取得本人的測驗快照；取消、不存在或非本人 attempt 回 `404 ATTEMPT_NOT_FOUND` |
+| POST | `/api/quizzes/attempts/:attemptId/answers` | 同一會員 | **尚未實作**；C 擁有；預計使用 `{ ordinal, selectedChoices }`，首版只收一個選項索引 |
+| GET | `/api/quizzes/attempts/:attemptId/result` | 同一會員 | **尚未實作**；完成後回成績、通過狀態、正解和解析 |
+| GET | `/api/skills/{skillId}/quiz-availability` | 會員 | **E 此分支已實作**；回可用狀態、先修缺口和符合 C v1 規則的題數；不回題目或答案 |
+| GET | `/api/progress/history?skillId=...` | 會員 | **E 此分支已實作**；沿用 `limit`／`cursor`，不另做 C 專用 history route |
 
-建立 attempt 時，後端檢查會員、active skill、先修條件和至少 5 道符合正式題庫規則的題目，再抽出 5 題並在同一 transaction 保存技能名稱、題目、選項、作答方式和答案快照。新 attempt 回 HTTP 201；建立重送回 HTTP 200。建立新測驗不會刪除會員先前尚未完成的測驗。只有擁有該測驗的 session 會員可讀取。
+C PR #93 的冪等結果為：第一次建題 `201`；相同會員、相同 key 和相同本文重送 `200` 並回同一 attempt；同 key 換本文回 `409 IDEMPOTENCY_KEY_CONFLICT`。原 attempt 若已取消，舊 key 重送仍回 `200` 且 `status: "cancelled"`，不重啟也不另建；讀取已取消 attempt 回 `404 ATTEMPT_NOT_FOUND`。新測驗需新 key。key 以 `(session userId, key)` 唯一，資料庫儲存本文 fingerprint；詳見[Idempotency-Key 使用說明](idempotency-key-guide.md)。
 
-目前 `GET /api/quizzes/attempts/:attemptId` 只回 prompt、choices、answerMode、ordinal、已保存的 selectedChoices／answeredAt；即使某題已作答但 attempt 仍在進行，也不回 `correctChoices`、`choiceExplanations`、`explanation` 或正確性布林值。結果資訊應由未來的 result endpoint 在完成後提供。
+E 的 `getQuizAvailability(database, { userId, skillId })` 和 `GET /api/skills/{skillId}/quiz-availability` 檢查 active skill、會員先修完成和符合單選三選項一個正解、內容完整的正式題數；至少五題才可開始。此服務沒有教材 ready 判斷，因為目前共用 schema 沒有 lesson publication 欄位。C PR #93 的 `tutorials.js` 只有一筆 `draft` 樣本，該 gate 會擋住所有尚未列入靜態清單的技能；C/E 對齊時應改用共用服務，或先決定教材狀態的正式 schema/API 來源。建立測驗的 POST 必須在 transaction 內重做可用性檢查，不能只信任之前的 GET。
 
-Idempotency-Key 以 `(session userId, key)` 唯一。fingerprint 對 `{ skillId }` 的 canonical JSON UTF-8 bytes 做 SHA-256；相同 key、相同本文重送回相同 attempt 和原題目快照，相同 key 但不同本文回 `409 IDEMPOTENCY_KEY_REUSED`。題目快照和 attempt 必須在同一 transaction 建立，key 不設過期，避免延遲重送建立第二次測驗。前端逾時重試應保存並沿用同一個 key；開始新的 attempt 才產生新 key。
+C 的讀題 route 不得回傳正解、選項解析或作答正確性。正解只由 E 的 backend-only `listPublishedQuestionsForSkill()` 提供給可信任的 server code。測驗建立和讀題雖在 C PR #93 有實作，答案提交、結果結算、永久通過和 XP 事件的真實端到端流程仍待 C/E/D 對齊；PR #93 的獨立測試不是 E app 的 live DB 整合驗收。
 
-答案由 `(attemptId, ordinal)` 唯一定位；完全相同的重送不新增列。測驗仍在進行時可更改答案，該列只保存最新選取；attempt 結算後不可改答案。最後一題答案寫入後，若五題都已有答案，後端在同一 transaction 鎖定 attempt、由快照重算五題成績，僅允許一次從 `in_progress` 轉為 `completed`；再送相同答案回既有結果，不同答案或更新已完成 attempt 回 `409 ATTEMPT_ALREADY_COMPLETED`。重送結算不得再建立完成、revision 或 XP 紀錄。
+### D／C 共用學習歷史 API（E 共用路由已實作，待模組畫面串接）
 
-### D 學習歷史 API（E 共用路由已實作，待 D 畫面串接）
-
-`GET /api/progress/history?limit=20&cursor=...` 需會員 session，會員 ID 一律取自 session。此路由已出現在 API Explorer。response data 為 `{ items, nextCursor }`；每筆目前包含 `activityId`（等於 `attemptId`）、`activityType: "quiz_attempt"`、`skillId`、`skillTitle`、`catalogVersion`、`completedAt` 及 `result: { correctCount, totalQuestions, passed }`。無紀錄時回空 `items`，不是錯誤。
+`GET /api/progress/history?limit=10&skillId=html-basics&cursor=...` 需會員 session，會員 ID 一律取自 session。`skillId` 為選填篩選；C 初次載入 10 筆，後續使用 `nextCursor`。游標綁定原篩選條件，後續請求必須沿用相同 `skillId`。response data 為 `{ items, nextCursor }`；每筆目前包含 `activityId`（等於 `attemptId`）、`activityType: "quiz_attempt"`、`skillId`、`skillTitle`、`catalogVersion`、`completedAt` 及 `result: { correctCount, totalQuestions, passed }`。無紀錄時回空 `items`，不是錯誤。取消的 attempt 不列入歷史。
 
 成功回應範例：
 
@@ -211,7 +215,11 @@ Idempotency-Key 以 `(session userId, key)` 唯一。fingerprint 對 `{ skillId 
 
 會員詳情中的 XP 讀取 `xp_ledger`，進度讀取 `user_skill_completions`。首次完成與 `user_progress_revisions`、首通 XP event 必須同 transaction；C 在 completion service 回傳 `newlyCompleted: true` 時呼叫 E 的 backend-only `enqueueSkillFirstPassXpEvent()`。D 從資料列讀取的事件 envelope 是 `{ eventId, userId, sourceType: \"quiz_attempt\", sourceId: attemptId, eventType: \"skill.first_pass\", payload: { skillId, attemptId, catalogVersion, completedAt } }`。它只表示「某會員首次通過某技能」；新事件的 `amount` 為 `NULL`，由 D 依規則計算並把實際金額寫入 ledger。D 以 `event_id` 和 `(source_type, source_id, event_type)` 防重，重用自然鍵但內容不同視為衝突而不是覆寫。
 
-D worker 使用 `FOR UPDATE SKIP LOCKED` 搭配 `lease_token`／`lease_expires_at` claim 工作。確認或回報失敗必須帶當前 token；過期事件可重領，舊 worker 不能確認新 worker 的 lease。每次 claim 增加 `attempts`；第一次立即執行，失敗後採 full-jitter 指數退避（5 秒起、上限 1 小時），最多 12 次；到達上限保留為 terminal `failed` 供人工檢查／重試。ledger insert 和 Outbox completed 標記需在同一 DB transaction；`xp_ledger.event_id` unique 保證重試不重複入帳。
+D worker 預期使用 `FOR UPDATE SKIP LOCKED` 搭配 `lease_token`／`lease_expires_at` claim 工作。確認或回報失敗必須帶當前 token；過期事件可重領，舊 worker 不能確認新 worker 的 lease。Migration 已提供欄位和索引，但 worker SQL 尚待 D 實作與 review。full-jitter 指數退避（5 秒起、上限 1 小時）及最多 12 次是待 D review 的候選值，尚未定案。ledger insert 和 Outbox completed 標記應在同一 DB transaction；`xp_ledger.event_id` unique 保證重試不重複入帳。
+
+D 可先用 `GET /api/me`、`GET /api/skills`、`GET /api/progress` 和 `GET /api/progress/history` 串會員資料、目錄、完成狀態及近期測驗活動。這些 API 只透過 session 查目前會員；`GET /api/progress/history` 目前只含已完成的測驗，不含 XP 入帳明細。
+
+P2-D-05 要求的 `GET /api/progress/achievements` 和 P2-D-06 指定的 `GET /api/progress/dashboard` 目前尚未加入 Express/OpenAPI；XP worker 的 claim／ack／fail 也不是公開 HTTP API。P2-D-01 的 XP 餘額以 `xp_ledger` 加總，管理員 API 內雖有 XP 欄位，會員端不得使用管理員身份路由。請 D 先提供 XP 等級門檻、成就資料模型、Dashboard 欄位和必要的逐筆 XP 查詢需求，再由 D/E 一起定義會員 session-scoped response 與新增 migration；不可依照尚未存在的 endpoint 開發正式 client。
 
 ## 管理後端與資料責任
 
@@ -230,12 +238,12 @@ D worker 使用 `FOR UPDATE SKIP LOCKED` 搭配 `lease_token`／`lease_expires_a
 | Issue | 已交付／既有基礎 | 完成狀態與下一個驗收點 |
 | --- | --- | --- |
 | P2-E-01 環境與服務基礎 | Express app、環境驗證、Node 24、共用 middleware 和路由已建立；CORS 預檢包含實際支援的 HTTP 方法。 | 啟動、健康檢查、設定拒絕與 graceful shutdown 由 API 整合測試驗收。 |
-| P2-E-02 PostgreSQL 與共用 Schema | Migrations 001–010 定義身份、技能、題庫、測驗快照、進度、歷史投影、冪等與 XP worker lease；[Schema 概覽](database-schema.md)列出欄位、關聯和責任。 | 使用獨立 PostgreSQL 17 測試資料庫做乾淨套用、重跑、checksum 和查詢驗收；團隊仍需確認共用 PostgreSQL major version。 |
-| P2-E-03 會員登入與 Session | Session 身份推導、cookie、登出、停權、密碼重設與 `requireMember` 已實作；A 現有 profile、忘記／重設密碼、onboarding 畫面改用真 API。 | 整合測試驗證使用者狀態、密碼重設後舊 session 失效及會員只能更新自己的 profile。 |
+| P2-E-02 PostgreSQL 與共用 Schema | Migrations 001–012 定義身份、技能、題庫、測驗快照、進度、歷史投影、冪等、XP worker lease、管理員角色和重設碼嘗試次數；[Schema 概覽](database-schema.md)列出欄位、關聯和責任。 | 使用獨立 PostgreSQL 17 測試資料庫做乾淨套用、重跑、checksum 和查詢驗收；團隊仍需確認共用 PostgreSQL major version。 |
+| P2-E-03 會員登入與 Session | Session 身份推導、cookie、登出、停權、六位數碼重設密碼與 `requireMember` 已實作；忘記／重設密碼畫面改用共用 API。依 A 的測試流程，新註冊直接設定 `email_verified_at` 並建立 session，不確認信箱所有權。 | 資料庫整合測試驗證直接註冊、重設碼錯誤／過期／一次性及舊 session 失效；A review 欄位及 UI 提示。若公開上線或存放真實會員資料，需恢復信箱驗證或等效保護。 |
 | P2-E-04 技能目錄與進度 | `skillId` 為 B×C 已確認的標準 ID；skills/progress 共用目錄版本計算；內部 completion service 驗證通過測驗、冪等寫入並只在首次完成增加 revision。 | 使用 PostgreSQL 驗證目錄與進度一致、首次／重複完成及無效 attempt；正式技能資料由 B 提供。 |
-| P2-E-05 題庫資料與維護 | 管理員 CRUD 保持受管理員 session 保護；C backend 可用內部服務查正式題目及正解；新增題目索引 DB constraints 和每技能題庫覆蓋檢查。 | 測試驗證正解不經公開 HTTP 端點提供、展示／草稿／刪除題被排除及每個正式技能至少 5 題。正式內容由 B/C 提供。 |
+| P2-E-05 題庫資料與維護 | 管理員 CRUD 保持受管理員 session 保護；E backend-only service 可查正式題目與正解，並提供不含題目／答案的會員可用性 API；新增題目索引 DB constraints 和每技能題庫覆蓋檢查。C PR #93 尚未改用 E service，也未掛入本 app。 | 測試驗證正解不經公開 HTTP 端點提供、展示／草稿／刪除題被排除及每個正式技能至少 5 題。正式內容由 B/C 提供；C/E 接線和共用 app DB 整合仍待驗收。 |
 | P2-E-06 回應格式與驗證 | Success/error envelope、`error.fields`、request ID、狀態碼與前端 API client 統一；補上 `PUT` preflight。 | 測試驗證欄位錯誤、無效 JSON、CORS、認證錯誤與資料庫錯誤均遵守契約。 |
-| P2-E-07 跨模組整合與 API 測試 | 新增獨立 test database runner、migration rerun、API/session/profile/progress/question bank/admin integration tests；B/C/D 契約先以 API shape 和服務介面暫驗。 | 只有接上 B/C/D 真實服務並取得組員驗收後才算完整 E07；目前測試替身不等同端對端完成。 |
+| P2-E-07 跨模組整合與 API 測試 | 新增獨立 test database runner、migration rerun、API/session/profile/progress/question bank/admin integration tests；B/C/D 契約先以 API shape 和服務介面暫驗。本次 review 通過 build 和 18 個不需資料庫的測試；未設定 `TEST_DATABASE_URL`，沒有執行 migration 或 DB 整合測試。 | 只有接上 B/C/D 真實服務並取得組員驗收後才算完整 E07；目前測試替身不等同端對端完成。 |
 
 ## 後續功能想法收件清單
 

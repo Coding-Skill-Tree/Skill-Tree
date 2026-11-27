@@ -15,10 +15,11 @@ export default function AdminLayout({ children, activePage, breadcrumb, question
           <a className={`admin-nav-link${activePage === "questions" ? " is-active" : ""}`} href="/admin/questions" aria-current={activePage === "questions" ? "page" : undefined}><AdminIcon name="stack"/>題庫管理{questionCount !== undefined && <span className="admin-nav-count">{questionCount}</span>}</a>
           <span className="admin-nav-label admin-nav-label-spaced">管理工具</span>
           <a className={`admin-nav-link${activePage === "members" ? " is-active" : ""}`} href="/admin/members" aria-current={activePage === "members" ? "page" : undefined}><AdminIcon name="users"/>會員管理</a>
+          {admin?.role === "owner" && <a className={`admin-nav-link${activePage === "team" ? " is-active" : ""}`} href="/admin/team" aria-current={activePage === "team" ? "page" : undefined}><AdminIcon name="users"/>組員權限</a>}
           <a className="admin-nav-link" href="/admin/questions/new"><AdminIcon name="plus"/>新增題目</a>
         </nav>
         <div className="admin-sidebar-bottom">
-          <div className="admin-sidebar-user"><span className="admin-avatar">{admin?.username?.slice(0, 1)?.toUpperCase() || "A"}</span><span><strong>{admin?.username || "管理員"}</strong><small>管理員帳號</small></span></div>
+          <div className="admin-sidebar-user"><span className="admin-avatar">{admin?.username?.slice(0, 1)?.toUpperCase() || "A"}</span><span><strong>{admin?.username || "管理員"}</strong><small>{admin?.role === "owner" ? "專案最高管理者" : "組員編輯權限"}</small></span></div>
         </div>
       </aside>
 
@@ -26,15 +27,16 @@ export default function AdminLayout({ children, activePage, breadcrumb, question
         <header className="admin-topbar">
           <Brand compact/>
           <div className="admin-breadcrumb"><span>管理後台</span><AdminIcon name="chevron-right" size={14}/><strong>{breadcrumb}</strong></div>
-          <div className="admin-topbar-right"><div className="topbar-account"><span className="admin-avatar admin-avatar-small">{admin?.username?.slice(0, 1)?.toUpperCase() || "A"}</span><span><strong>{admin?.username || "管理員"}</strong><small>Administrator</small></span></div><button className="admin-logout-button" type="button" onClick={onLogout}>登出</button></div>
+          <div className="admin-topbar-right"><div className="topbar-account"><span className="admin-avatar admin-avatar-small">{admin?.username?.slice(0, 1)?.toUpperCase() || "A"}</span><span><strong>{admin?.username || "管理員"}</strong><small>{admin?.role === "owner" ? "Owner" : "Editor"}</small></span></div><button className="admin-logout-button" type="button" onClick={onLogout}>登出</button></div>
         </header>
         {children}
       </div>
 
-      <nav className="admin-mobile-nav" aria-label="快速導覽">
+      <nav className={`admin-mobile-nav${admin?.role === "owner" ? " has-team" : ""}`} aria-label="快速導覽">
         <a className={activePage === "overview" ? "is-active" : ""} href="/admin" aria-current={activePage === "overview" ? "page" : undefined}><AdminIcon name="grid" size={19}/><span>總覽</span></a>
         <a className={activePage === "questions" ? "is-active" : ""} href="/admin/questions" aria-current={activePage === "questions" ? "page" : undefined}><AdminIcon name="stack" size={19}/><span>題庫</span></a>
         <a className={activePage === "members" ? "is-active" : ""} href="/admin/members" aria-current={activePage === "members" ? "page" : undefined}><AdminIcon name="users" size={19}/><span>會員</span></a>
+        {admin?.role === "owner" && <a className={activePage === "team" ? "is-active" : ""} href="/admin/team" aria-current={activePage === "team" ? "page" : undefined}><AdminIcon name="users" size={19}/><span>組員</span></a>}
         <a href="/admin/questions/new"><AdminIcon name="plus" size={19}/><span>新增</span></a>
       </nav>
     </div>);

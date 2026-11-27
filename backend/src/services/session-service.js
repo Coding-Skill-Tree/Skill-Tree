@@ -12,15 +12,27 @@ function secureCookies() {
 }
 
 export async function createMemberSession(userId, response) {
+  const session = await createMemberSessionRecord(pool, userId);
+  session.attachCookie(response);
+  return session.expiresAt;
+}
+
+// Use inside an existing transaction. The cookie is attached only after the
+// caller commits, so a rolled-back account cannot leave a valid-looking cookie.
+export async function createMemberSessionRecord(database, userId) {
   const token = randomBytes(32).toString('base64url');
   const ttlDays = runtimeConfig.sessionTtlDays;
   const expiresAt = new Date(Date.now() + ttlDays * 86_400_000);
-  await pool.query(
+  await database.query(
     'INSERT INTO member_sessions(user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
     [userId, digest(token), expiresAt],
   );
-  response.append('Set-Cookie', sessionCookie('sid', token, ttlDays * 86_400, { secure: secureCookies() }));
-  return expiresAt;
+  return {
+    expiresAt,
+    attachCookie(response) {
+      response.append('Set-Cookie', sessionCookie('sid', token, ttlDays * 86_400, { secure: secureCookies() }));
+    },
+  };
 }
 
 export async function revokeMemberSession(request, response) {

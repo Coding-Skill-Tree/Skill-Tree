@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import { pool } from '../db/pool.js';
-import { requireAdmin } from '../middleware/require-admin.js';
+import { requireAdmin, requireOwner } from '../middleware/require-admin.js';
 import { HttpError, validationError } from '../lib/http-error.js';
 import { sendSuccess } from '../lib/api-response.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
@@ -25,7 +25,7 @@ adminRouter.post('/auth/login', async (request, response, next) => {
     const subjectHash = hashRateLimitSubject('admin_login', username);
     await assertLoginNotBlocked('admin_login', subjectHash);
     const result = await pool.query(
-      'SELECT id, username, password_hash AS "passwordHash", disabled_at AS "disabledAt" FROM admin_accounts WHERE username = $1',
+      'SELECT id, username, role, password_hash AS "passwordHash", disabled_at AS "disabledAt" FROM admin_accounts WHERE username = $1',
       [username],
     );
     const admin = result.rows[0];
@@ -37,14 +37,14 @@ adminRouter.post('/auth/login', async (request, response, next) => {
 
     await clearLoginFailures('admin_login', subjectHash);
     await createAdminSession(admin.id, response);
-    sendSuccess(response, { adminId: String(admin.id), username: admin.username });
+    sendSuccess(response, { adminId: String(admin.id), username: admin.username, role: admin.role });
   } catch (error) {
     next(error);
   }
 });
 
 adminRouter.get('/me', requireAdmin, (request, response) => {
-  sendSuccess(response, { adminId: String(request.admin.id), username: request.admin.username });
+  sendSuccess(response, { adminId: String(request.admin.id), username: request.admin.username, role: request.admin.role });
 });
 
 adminRouter.post('/auth/logout', async (request, response, next) => {
@@ -60,6 +60,114 @@ adminRouter.use(requireAdmin);
 
 const MEMBERS_PAGE_SIZE = 20;
 const MAX_BIGINT = 9223372036854775807n;
+
+function parseTeamAccountId(value) {
+  if (typeof value !== 'string' || !/^[1-9][0-9]*$/u.test(value)) {
+    throw new HttpError(404, 'TEAM_ACCOUNT_NOT_FOUND', '找不到這位組員');
+  }
+  try {
+    if (BigInt(value) > MAX_BIGINT) throw new HttpError(404, 'TEAM_ACCOUNT_NOT_FOUND', '找不到這位組員');
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(404, 'TEAM_ACCOUNT_NOT_FOUND', '找不到這位組員');
+  }
+  return value;
+}
+
+function parseTeamAccountChanges(body) {
+  const fields = {};
+  const changes = {};
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw validationError({ body: '請提供組員權限或停用狀態' });
+  }
+  for (const key of Object.keys(body)) {
+    if (!['role', 'disabled'].includes(key)) fields[key] = '不支援此欄位';
+  }
+  if (Object.hasOwn(body, 'role')) {
+    fields.role = '角色調整需由可信任管理主機執行';
+  }
+  if (Object.hasOwn(body, 'disabled')) {
+    if (typeof body.disabled !== 'boolean') fields.disabled = '停用狀態必須是布林值';
+    else changes.disabled = body.disabled;
+  }
+  if (Object.keys(body).length === 0) fields.body = '至少要提供一項變更';
+  if (Object.keys(fields).length) throw validationError(fields);
+  return changes;
+}
+
+adminRouter.get('/team', requireOwner, async (_request, response, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT id::text AS id, username, role, disabled_at AS "disabledAt", created_at AS "createdAt"
+       FROM admin_accounts ORDER BY created_at, id`,
+    );
+    sendSuccess(response, result.rows.map((account) => ({
+      ...account,
+      createdAt: new Date(account.createdAt).toISOString(),
+      disabledAt: account.disabledAt ? new Date(account.disabledAt).toISOString() : null,
+    })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.patch('/team/:id', requireOwner, async (request, response, next) => {
+  const accountId = parseTeamAccountId(request.params.id);
+  let changes;
+  try {
+    changes = parseTeamAccountChanges(request.body);
+  } catch (error) {
+    return next(error);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const currentResult = await client.query(
+      'SELECT id::text AS id, username, role, disabled_at AS "disabledAt" FROM admin_accounts WHERE id = $1 FOR UPDATE',
+      [accountId],
+    );
+    const current = currentResult.rows[0];
+    if (!current) throw new HttpError(404, 'TEAM_ACCOUNT_NOT_FOUND', '找不到這位組員');
+    if (current.id === String(request.admin.id)) {
+      throw validationError({ account: '最高管理者不能透過此操作修改或停用自己的帳號' });
+    }
+    if (current.role === 'owner') {
+      throw validationError({ account: '不能透過組員管理修改最高管理者' });
+    }
+
+    const nextDisabled = changes.disabled ?? Boolean(current.disabledAt);
+    const updated = await client.query(
+      `UPDATE admin_accounts
+       SET disabled_at = CASE WHEN $1 THEN COALESCE(disabled_at, now()) ELSE NULL END, updated_at = now()
+       WHERE id = $2
+       RETURNING id::text AS id, username, role, disabled_at AS "disabledAt", created_at AS "createdAt"`,
+      [nextDisabled, accountId],
+    );
+
+    if (changes.disabled === true) {
+      await client.query('DELETE FROM admin_sessions WHERE admin_id = $1', [accountId]);
+    }
+    const auditAction = changes.disabled ? 'admin.disable' : 'admin.enable';
+    await client.query(
+      `INSERT INTO admin_audit_log(admin_id, action, target_type, target_id, metadata)
+       VALUES ($1, $2, 'admin_account', $3, $4::jsonb)`,
+      [request.admin.id, auditAction, accountId, JSON.stringify({ role: current.role, disabled: nextDisabled })],
+    );
+    await client.query('COMMIT');
+    const account = updated.rows[0];
+    sendSuccess(response, {
+      ...account,
+      createdAt: new Date(account.createdAt).toISOString(),
+      disabledAt: account.disabledAt ? new Date(account.disabledAt).toISOString() : null,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    next(error);
+  } finally {
+    client.release();
+  }
+});
 
 function memberNotFound() {
   return new HttpError(404, 'MEMBER_NOT_FOUND', '找不到這位會員');

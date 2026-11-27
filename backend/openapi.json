@@ -3,7 +3,7 @@
   "info": {
     "title": "Skill Tree Shared API",
     "version": "1.0.0",
-    "description": "Skill Tree 共用後端 HTTP API。此 OpenAPI 依目前 Express 路由整理；成功回應使用 success/data，錯誤使用 success/error。API Explorer 請從前端同源代理開啟（例如 http://localhost:5173/api/docs），先呼叫登入 API，再於同一個瀏覽器工作階段測試受保護端點。會員 sid 與管理員 admin_sid 為 HttpOnly cookie，無須也不可手動輸入 cookie 值。請只連開發資料庫；題庫新增、修改、刪除與會員停權操作會寫入資料。Email 驗證與密碼重設需要收取信件中的一次性 token。測驗 HTTP API 尚由 C 模組負責，完成紀錄與題庫查詢的內部服務不會暴露成瀏覽器端點。 C 的建立測驗與取題 routes 已接入共用 Express；答案提交、結算和測驗歷史 HTTP routes 尚待 C 完成。"
+    "description": "Skill Tree 共用後端 HTTP API。此 OpenAPI 列出目前 E app 已掛載的 routes；成功回應使用 success/data，錯誤使用 success/error。API Explorer 請從前端同源代理開啟（例如 http://localhost:5173/api/docs），再於同一個瀏覽器工作階段測試受保護端點。會員 sid 與管理員 admin_sid 為 HttpOnly cookie，無須也不可手動輸入 cookie 值。請只連開發資料庫；題庫和會員管理寫入會變更資料。新註冊建立可用 session 並導向 onboarding，不寄驗證信；忘記密碼使用六位數一次性驗證碼。題庫查詢、完成紀錄和 XP event producer 是 backend-only services。C 建立／讀題 API 在 PR #93，尚未掛載於此 E branch app；答案提交和結算也尚未提供。E 提供會員限定技能測驗可用性查詢和共用學習歷史，詳見 docs/quiz-api-integration.md。"
   },
   "servers": [
     {
@@ -96,7 +96,7 @@
         },
         "responses": {
           "201": {
-            "description": "建立帳號並寄出 Email 驗證信",
+            "description": "在同一個交易中建立會員、profile 與 sid session；註冊後不需驗證 Email，即可接續 onboarding。寄送歡迎信失敗不會撤銷已建立帳號。",
             "content": {
               "application/json": {
                 "schema": {
@@ -131,7 +131,7 @@
         "tags": [
           "Member Auth"
         ],
-        "summary": "驗證會員 Email",
+        "summary": "舊版 Email 驗證連結相容",
         "operationId": "verifyMemberEmail",
         "requestBody": {
           "required": true,
@@ -169,7 +169,8 @@
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
           }
-        }
+        },
+        "description": "新註冊流程不再寄送驗證連結；此端點只保留給仍有效的舊版連結。"
       }
     },
     "/api/auth/login": {
@@ -179,7 +180,7 @@
         ],
         "summary": "會員登入",
         "operationId": "loginMember",
-        "description": "成功時設定 HttpOnly sid cookie。API Explorer 的同源請求會在後續呼叫自動帶上 cookie。Email 必須先驗證。",
+        "description": "成功時設定 HttpOnly sid cookie。API Explorer 的同源請求會在後續呼叫自動帶上 cookie。新註冊帳號建立時即標記 Email 流程完成；舊帳號仍需完成既有驗證或密碼重設流程。",
         "requestBody": {
           "required": true,
           "content": {
@@ -265,7 +266,7 @@
         ],
         "summary": "申請密碼重設",
         "operationId": "requestPasswordReset",
-        "description": "不論 Email 是否註冊都回相同訊息，避免洩漏會員存在與否。成功時寄出一次性連結；每個 Email 有寄送節流。",
+        "description": "不論 Email 是否註冊都回相同訊息，避免洩漏會員存在與否。成功時寄出六位數驗證碼；每個 Email 每 60 秒最多寄送一次。驗證碼以 HMAC 雜湊儲存，10 分鐘有效，最多 5 次錯誤輸入。",
         "requestBody": {
           "required": true,
           "content": {
@@ -310,15 +311,15 @@
         "tags": [
           "Member Auth"
         ],
-        "summary": "檢查密碼重設 token",
-        "operationId": "verifyPasswordResetToken",
-        "description": "只檢查有效性，不消耗 token。正式重設仍須呼叫 POST /api/auth/reset-password。",
+        "summary": "檢查密碼重設驗證碼",
+        "operationId": "verifyPasswordResetCode",
+        "description": "以 { email, code } 檢查六位數驗證碼，不消耗成功驗證的碼；錯誤輸入會累計，最多 5 次。",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TokenRequest"
+                "$ref": "#/components/schemas/ResetCodeVerifyRequest"
               }
             }
           }
@@ -328,7 +329,7 @@
             "description": "token 有效，無回應本文"
           },
           "400": {
-            "$ref": "#/components/responses/InvalidToken"
+            "$ref": "#/components/responses/InvalidResetCode"
           },
           "403": {
             "$ref": "#/components/responses/ForbiddenRequest"
@@ -350,15 +351,15 @@
         "tags": [
           "Member Auth"
         ],
-        "summary": "使用 token 重設密碼",
+        "summary": "使用驗證碼重設密碼",
         "operationId": "resetMemberPassword",
-        "description": "成功後 token 會被消耗，並撤銷該會員既有的所有 session。",
+        "description": "以 Email、六位數驗證碼和新密碼完成重設。成功後驗證碼會被消耗，該會員所有既有 sessions 都會撤銷。",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResetPasswordRequest"
+                "$ref": "#/components/schemas/ResetCodePasswordRequest"
               }
             }
           }
@@ -368,7 +369,7 @@
             "description": "密碼已重設，無回應本文"
           },
           "400": {
-            "$ref": "#/components/responses/ValidationError"
+            "$ref": "#/components/responses/InvalidResetCode"
           },
           "403": {
             "$ref": "#/components/responses/ForbiddenRequest"
@@ -1282,7 +1283,7 @@
           "Skills"
         ],
         "summary": "讀取會員學習歷史",
-        "description": "目前以已完成的測驗 attempt 作為學習活動來源；會員身分由 sid session 決定。",
+        "description": "目前以已完成的測驗 attempt 作為學習活動來源；可用 skillId 篩選。會員身分由 sid session 決定。帶 cursor 請沿用同一個 skillId 篩選。",
         "operationId": "getMemberLearningHistory",
         "security": [
           {
@@ -1290,6 +1291,17 @@
           }
         ],
         "parameters": [
+          {
+            "name": "skillId",
+            "in": "query",
+            "required": false,
+            "description": "選填；只回傳指定技能的活動。使用 cursor 時需沿用同一個 skillId。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
           {
             "name": "limit",
             "in": "query",
@@ -1339,98 +1351,88 @@
         }
       }
     },
-    "/api/quizzes/attempts": {
-      "post": {
+    "/api/admin/team": {
+      "get": {
         "tags": [
-          "Quizzes"
+          "Admin Auth"
         ],
-        "summary": "建立五題測驗",
-        "description": "驗證會員、技能啟用狀態、先修條件和至少五道正式發布題目；在同一資料庫交易保存技能名稱、測驗和題目快照。相同 Idempotency-Key 與本文會重送原 attempt；不同本文回 409。建立新測驗不會刪除舊 attempt。",
-        "operationId": "createQuizAttempt",
+        "summary": "列出組員帳號",
+        "operationId": "listAdminTeam",
+        "description": "僅 owner 可讀取；不回傳密碼雜湊或會員資料。",
         "security": [
           {
-            "memberSession": []
+            "adminSession": []
           }
         ],
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "description": "每次新的建立操作使用 UUID。遇到逾時或網路錯誤重試時，保留同一個 key；開始另一筆測驗時產生新 key。",
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-              "example": "db3ad4d3-614c-4a12-a01e-896f32086008"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QuizAttemptCreateRequest"
-              },
-              "example": {
-                "skillId": "html-basics"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "冪等重送；回傳第一次建立的同一份快照。",
+            "description": "組員帳號清單",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QuizAttemptSuccessResponse"
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "username",
+                          "role",
+                          "disabledAt",
+                          "createdAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "editor"
+                            ]
+                          },
+                          "disabledAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
-          },
-          "201": {
-            "description": "建立成功。",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QuizAttemptSuccessResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/ValidationError"
           },
           "401": {
-            "$ref": "#/components/responses/MemberUnauthorized"
+            "$ref": "#/components/responses/AdminUnauthorized"
           },
           "403": {
             "$ref": "#/components/responses/ForbiddenRequest"
           },
-          "404": {
-            "description": "技能不存在或已停用。",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "題數不足或此 Idempotency-Key 已用於不同本文。",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "$ref": "#/components/responses/DatabaseUnavailable"
+          "429": {
+            "$ref": "#/components/responses/TooManyAttempts"
           },
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
@@ -1438,27 +1440,108 @@
         }
       }
     },
-    "/api/quizzes/attempts/{attemptId}": {
+    "/api/admin/team/{id}": {
       "parameters": [
         {
-          "name": "attemptId",
+          "name": "id",
           "in": "path",
           "required": true,
-          "description": "測驗 UUID。只允許建立該測驗的會員讀取。",
           "schema": {
             "type": "string",
-            "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+            "pattern": "^[1-9][0-9]*$"
+          }
+        }
+      ],
+      "patch": {
+        "tags": [
+          "Admin Auth"
+        ],
+        "summary": "停用或恢復組員帳號",
+        "operationId": "updateAdminTeamAccount",
+        "description": "僅 owner 可操作。停用會撤銷該帳號的現有管理員 session。角色建立／變更只能由可信任主機使用 migration credential 執行。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "disabled": {
+                    "type": "boolean",
+                    "description": "true 停用並撤銷 session；false 恢復登入。"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新後的組員帳號",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "404": {
+            "description": "找不到組員帳號",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyAttempts"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/skills/{skillId}/quiz-availability": {
+      "parameters": [
+        {
+          "name": "skillId",
+          "in": "path",
+          "required": true,
+          "description": "技能目錄中的 skillId。",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
           }
         }
       ],
       "get": {
         "tags": [
-          "Quizzes"
+          "Skills"
         ],
-        "summary": "讀取測驗題目快照",
-        "description": "回傳作答所需的題目、選項、作答方式和目前選擇。無論答案是否已儲存，這支路由都不回傳正解或選項解析。",
-        "operationId": "getQuizAttempt",
+        "summary": "查詢會員是否可開始該技能測驗",
+        "description": "只回傳可用狀態、原因、缺少的先修技能 ID 和符合 C v1 題型的題數；不回傳題目或正解。開始測驗的 POST 必須在 transaction 內重新檢查。教材 ready 狀態目前沒有共用 schema 欄位。",
+        "operationId": "getQuizAvailability",
         "security": [
           {
             "memberSession": []
@@ -1466,11 +1549,11 @@
         ],
         "responses": {
           "200": {
-            "description": "測驗與題目快照，不含正解和解析。",
+            "description": "目前會員的測驗可用狀態",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QuizAttemptSuccessResponse"
+                  "$ref": "#/components/schemas/QuizAvailabilityResponse"
                 }
               }
             }
@@ -1482,17 +1565,7 @@
             "$ref": "#/components/responses/MemberUnauthorized"
           },
           "404": {
-            "description": "測驗不存在或不屬於此會員。",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "測驗已取消。",
+            "description": "技能不存在或已停用",
             "content": {
               "application/json": {
                 "schema": {
@@ -1805,6 +1878,24 @@
             }
           }
         }
+      },
+      "InvalidResetCode": {
+        "description": "重設驗證碼無效、已使用、已過期或已達輸入次數上限；密碼欄位驗證錯誤也使用同一錯誤 envelope。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "INVALID_OR_EXPIRED_CODE",
+                "message": "驗證碼無效、已過期或已達輸入次數上限",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+              }
+            }
+          }
+        }
       }
     },
     "schemas": {
@@ -2110,7 +2201,8 @@
         "type": "object",
         "required": [
           "adminId",
-          "username"
+          "username",
+          "role"
         ],
         "properties": {
           "adminId": {
@@ -2119,6 +2211,14 @@
           },
           "username": {
             "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "editor"
+            ],
+            "description": "owner 為唯一最高管理者；editor 為組員瀏覽／編輯權限。"
           }
         }
       },
@@ -2156,12 +2256,58 @@
           "data": {
             "type": "object",
             "required": [
-              "email"
+              "userId",
+              "email",
+              "createdAt",
+              "username",
+              "avatarId",
+              "route",
+              "onboardingCompleted",
+              "hasPassword",
+              "nextStep"
             ],
             "properties": {
+              "userId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$"
+              },
               "email": {
                 "type": "string",
                 "format": "email"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "username": {
+                "type": "string",
+                "nullable": true
+              },
+              "avatarId": {
+                "type": "string",
+                "nullable": true
+              },
+              "route": {
+                "type": "string",
+                "nullable": true
+              },
+              "onboardingCompleted": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              },
+              "hasPassword": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              },
+              "nextStep": {
+                "type": "string",
+                "enum": [
+                  "/onboarding"
+                ]
               }
             }
           }
@@ -2610,8 +2756,8 @@
           },
           "choices": {
             "type": "array",
-            "minItems": 2,
-            "maxItems": 10,
+            "minItems": 3,
+            "maxItems": 3,
             "items": {
               "type": "string",
               "minLength": 1,
@@ -2788,8 +2934,7 @@
           "answerMode": {
             "type": "string",
             "enum": [
-              "single",
-              "multiple"
+              "single"
             ]
           },
           "correctChoices": {
@@ -3208,6 +3353,7 @@
           },
           "selectedChoices": {
             "type": "array",
+            "maxItems": 1,
             "uniqueItems": true,
             "items": {
               "type": "integer",
@@ -3295,6 +3441,104 @@
           },
           "data": {
             "$ref": "#/components/schemas/QuizAttempt"
+          }
+        }
+      },
+      "ResetCodeVerifyRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "code"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "description": "保留前導零的六位數字字串。"
+          }
+        }
+      },
+      "ResetCodePasswordRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "code",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "description": "保留前導零的六位數字字串。"
+          },
+          "password": {
+            "$ref": "#/components/schemas/Password"
+          }
+        }
+      },
+      "QuizAvailabilityResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "skillId",
+              "available",
+              "reason",
+              "missingPrerequisiteSkillIds",
+              "availableQuestionCount",
+              "requiredQuestionCount"
+            ],
+            "properties": {
+              "skillId": {
+                "type": "string"
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "SKILL_LOCKED",
+                  "INSUFFICIENT_QUESTIONS"
+                ]
+              },
+              "missingPrerequisiteSkillIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "availableQuestionCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "requiredQuestionCount": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
           }
         }
       }

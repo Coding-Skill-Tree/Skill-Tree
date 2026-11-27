@@ -86,7 +86,7 @@ const key = createQuizIdempotencyKey();
 const attempt = await startQuizAttempt("html-basics", key);
 ```
 
-`GET /api/quizzes/attempts/:attemptId` 只回題目與選項，不回正解或解析。答案提交、結算和測驗歷史 routes 尚未完成，所以目前還不能用此 API 完成整場測驗。管理員題庫 API 會回傳正解，不要拿它當會員作答 API。
+C 的 `POST /api/quizzes/attempts` 與 `GET /api/quizzes/attempts/:attemptId` 目前在 PR #93，尚未掛到 E 共用 app；切換到 E branch 直接呼叫會得到 404。E 已提供會員限定的 `GET /api/skills/{skillId}/quiz-availability`、題庫共用 service 和完成後的 `GET /api/progress/history?skillId=...`。答案提交與結算 routes 尚待 C 完成，因此目前還不能用共用 app 完成整場測驗。建立測驗要帶 `Idempotency-Key`；網路結果不確定時，沿用相同 key 和 `skillId` 重試，參考[操作說明](idempotency-key-guide.md)。管理員題庫 API 會回傳正解，不要拿它當會員作答 API。
 
 ## 開始前端 API 測試
 

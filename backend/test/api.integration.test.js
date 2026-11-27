@@ -8,15 +8,16 @@ import { app } from '../src/app.js';
 import { pool, closePool } from '../src/db/pool.js';
 import { hashPassword } from '../src/lib/password.js';
 import { hashRateLimitSubject } from '../src/services/auth-rate-limit.js';
+import { digestEmailCode } from '../src/services/email-code.js';
 import { listPublishedQuestionsForSkill, getPublishedQuestionCoverage } from '../src/services/question-bank.js';
 import { recordSkillCompletion } from '../src/services/progress-service.js';
 import { enqueueSkillFirstPassXpEvent } from '../src/services/xp-outbox.js';
 
 const tag = randomUUID().replaceAll('-', '').slice(0, 16);
 const password = 'SkillTree9';
-const resetToken = `integration-reset-${tag}`;
+const resetCode = '004219';
 const appOrigin = 'http://localhost:5173';
-const fixtures = { userIds: [], adminId: null, categoryId: `it-${tag}`, skillId: `it-${tag}` };
+const fixtures = { userIds: [], adminId: null, ownerId: null, categoryId: `it-${tag}`, skillId: `it-${tag}`, extraSkillIds: [] };
 let server;
 let baseUrl;
 let member;
@@ -24,10 +25,6 @@ let otherMember;
 let admin;
 let memberCookie;
 let adminCookie;
-
-function digest(value) {
-  return createHash('sha256').update(value).digest('hex');
-}
 
 async function createMember(label) {
   const email = `it-${label}-${tag}@example.test`;
@@ -53,8 +50,8 @@ async function createQuestion(prompt, { demo = false, published = true, active =
     `INSERT INTO questions(
        skill_id, prompt, choices, correct_choice, answer_mode, correct_choices,
        choice_explanations, explanation, active, is_demo, difficulty, status, deleted_at
-     ) VALUES ($1, $2, '["A","B"]'::jsonb, 0, 'single', '[0]'::jsonb,
-               '["Correct","Incorrect"]'::jsonb, 'Explanation', $3, $4,
+     ) VALUES ($1, $2, '["A","B","C"]'::jsonb, 0, 'single', '[0]'::jsonb,
+               '["Correct","Incorrect","Incorrect"]'::jsonb, 'Explanation', $3, $4,
                'beginner', $5, CASE WHEN $6 THEN now() ELSE NULL END)
      RETURNING id::text AS id`,
     [fixtures.skillId, prompt, active, demo, published ? 'published' : 'draft', deleted],
@@ -106,6 +103,11 @@ before(async () => {
     [admin.username, admin.passwordHash],
   );
   fixtures.adminId = adminResult.rows[0].id;
+  const ownerResult = await pool.query(
+    `INSERT INTO admin_accounts(username, password_hash, role) VALUES ($1, $2, 'owner') RETURNING id::text AS id`,
+    [`owner_${tag}`, admin.passwordHash],
+  );
+  fixtures.ownerId = ownerResult.rows[0].id;
 
   for (let index = 0; index < 5; index += 1) {
     await createQuestion(`Approved fixture ${tag} ${index}`);
@@ -139,6 +141,10 @@ after(async () => {
     await pool.query('DELETE FROM questions WHERE skill_id = $1', [fixtures.skillId]);
     await pool.query('DELETE FROM users WHERE id = ANY($1::bigint[])', [fixtures.userIds]);
     if (fixtures.adminId) await pool.query('DELETE FROM admin_accounts WHERE id = $1', [fixtures.adminId]);
+    if (fixtures.ownerId) await pool.query('DELETE FROM admin_accounts WHERE id = $1', [fixtures.ownerId]);
+    if (fixtures.extraSkillIds.length) {
+      await pool.query('DELETE FROM skills WHERE id = ANY($1::text[])', [fixtures.extraSkillIds]);
+    }
     await pool.query('DELETE FROM skills WHERE id = $1', [fixtures.skillId]);
     await pool.query('DELETE FROM skill_categories WHERE id = $1', [fixtures.categoryId]);
     const subjects = [member?.email, otherMember?.email].filter(Boolean).map((email) => hashRateLimitSubject('member_login', email));
@@ -156,14 +162,16 @@ test('Skill Tree API integration contract', async (t) => {
     assert.equal(openApi.status, 200);
     const spec = await openApi.json();
     assert.ok(spec.paths['/api/progress/history']);
-    assert.ok(spec.paths['/api/quizzes/attempts'].post.parameters.some((parameter) => parameter.name === 'Idempotency-Key'));
-    assert.ok(spec.paths['/api/quizzes/attempts/{attemptId}'].get);
+    assert.ok(spec.paths['/api/skills/{skillId}/quiz-availability'].get);
+    assert.equal(spec.paths['/api/quizzes/attempts'], undefined);
     const explorer = await api('/api/docs/');
     assert.equal(explorer.status, 200);
     assert.match(await explorer.text(), /Skill Tree API Explorer/u);
 
     const health = await api('/api/health');
     assert.equal(health.status, 200);
+    assert.equal(health.headers.get('cache-control'), 'no-store, max-age=0');
+    assert.equal(health.headers.get('x-content-type-options'), 'nosniff');
     assert.deepEqual(await health.json(), {
       success: true,
       data: { status: 'ok', database: 'connected' },
@@ -177,7 +185,7 @@ test('Skill Tree API integration contract', async (t) => {
     assert.equal(workbenchSource.status, 200);
     const sourceData = (await workbenchSource.json()).data;
     assert.equal(sourceData.path, 'backend/src/app.js');
-    assert.match(sourceData.content, /quizzesRouter/u);
+    assert.doesNotMatch(sourceData.content, /quizzesRouter/u);
     const unknownSource = await api('/api/dev/workbench/sources/../../.env');
     assert.equal(unknownSource.status, 404);
 
@@ -187,7 +195,7 @@ test('Skill Tree API integration contract', async (t) => {
     });
     assert.equal(preflight.status, 204);
     assert.match(preflight.headers.get('access-control-allow-methods'), /\bPUT\b/u);
-    const quizPreflight = await api('/api/quizzes/attempts', {
+    const quizPreflight = await api('/api/skills/any-skill/quiz-availability', {
       method: 'OPTIONS',
       origin: appOrigin,
     });
@@ -252,6 +260,44 @@ test('Skill Tree API integration contract', async (t) => {
     assert.ok(malformedPayload.error.requestId);
   });
 
+  await t.test('registration creates a login-ready account and sends no verification token', async () => {
+    const email = `it-register-${tag}@example.test`;
+    const response = await api('/api/auth/register', {
+      method: 'POST', origin: appOrigin, body: { email, password },
+    });
+    assert.equal(response.status, 201);
+    const registered = await response.json();
+    assert.equal(registered.data.email, email);
+    assert.equal(registered.data.onboardingCompleted, false);
+    assert.equal(registered.data.nextStep, '/onboarding');
+    const registrationCookie = cookieFrom(response, 'sid');
+    const account = await pool.query(
+      `SELECT id::text AS id, email_verified_at AS "emailVerifiedAt"
+       FROM users WHERE email_normalized = $1`,
+      [email],
+    );
+    assert.ok(account.rows[0]?.emailVerifiedAt);
+    fixtures.userIds.push(account.rows[0].id);
+    const verificationTokens = await pool.query(
+      `SELECT id FROM email_tokens WHERE user_id = $1 AND purpose = 'verify_email' AND used_at IS NULL`,
+      [account.rows[0].id],
+    );
+    assert.equal(verificationTokens.rowCount, 0);
+
+    const currentMember = await api('/api/me', { cookie: registrationCookie });
+    assert.equal(currentMember.status, 200);
+    assert.equal((await currentMember.json()).data.userId, account.rows[0].id);
+
+    const onboarding = await api('/api/me/profile', {
+      method: 'PATCH',
+      cookie: registrationCookie,
+      origin: appOrigin,
+      body: { username: `R_${tag.slice(0, 8)}`, avatarId: 'avatar-02' },
+    });
+    assert.equal(onboarding.status, 200);
+    assert.equal((await onboarding.json()).data.onboardingCompleted, true);
+  });
+
   await t.test('member session owns identity and onboarding updates only that member', async () => {
     const login = await api('/api/auth/login', {
       method: 'POST',
@@ -314,40 +360,71 @@ test('Skill Tree API integration contract', async (t) => {
     assert.deepEqual(await known.json(), await unknown.json());
   });
 
-  await t.test('reset token can be checked without consumption and reset revokes all sessions', async () => {
+  await t.test('reset code is rate-limited, single-use, and reset revokes all sessions', async () => {
     await pool.query(
       `INSERT INTO email_tokens(user_id, token_hash, purpose, expires_at)
-       VALUES ($1, $2, 'reset_password', now() + interval '1 hour')`,
-      [member.id, digest(resetToken)],
+       VALUES ($1, $2, 'reset_password', now() + interval '10 minutes')`,
+      [member.id, digestEmailCode(member.id, resetCode)],
     );
+    const wrongCode = await api('/api/auth/reset-password/verify', {
+      method: 'POST', origin: appOrigin, body: { email: member.email, code: '999999' },
+    });
+    assert.equal(wrongCode.status, 400);
+    assert.equal((await wrongCode.json()).error.code, 'INVALID_OR_EXPIRED_CODE');
+    const failedAttempts = await pool.query(
+      'SELECT attempt_count FROM email_tokens WHERE token_hash = $1',
+      [digestEmailCode(member.id, resetCode)],
+    );
+    assert.equal(failedAttempts.rows[0].attempt_count, 1);
+
+    const lockedCode = '123456';
+    await pool.query(
+      `INSERT INTO email_tokens(user_id, token_hash, purpose, expires_at)
+       VALUES ($1, $2, 'reset_password', now() + interval '10 minutes')`,
+      [otherMember.id, digestEmailCode(otherMember.id, lockedCode)],
+    );
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const invalid = await api('/api/auth/reset-password/verify', {
+        method: 'POST', origin: appOrigin, body: { email: otherMember.email, code: '999999' },
+      });
+      assert.equal(invalid.status, 400);
+    }
+    const exhausted = await api('/api/auth/reset-password/verify', {
+      method: 'POST', origin: appOrigin, body: { email: otherMember.email, code: lockedCode },
+    });
+    assert.equal(exhausted.status, 400);
+    assert.equal((await exhausted.json()).error.code, 'INVALID_OR_EXPIRED_CODE');
+
     const verify = await api('/api/auth/reset-password/verify', {
-      method: 'POST', origin: appOrigin, body: { token: resetToken },
+      method: 'POST', origin: appOrigin, body: { email: member.email, code: resetCode },
     });
     assert.equal(verify.status, 204);
-    const tokenBeforeReset = await pool.query('SELECT used_at FROM email_tokens WHERE token_hash = $1', [digest(resetToken)]);
+    const tokenBeforeReset = await pool.query('SELECT used_at FROM email_tokens WHERE token_hash = $1', [digestEmailCode(member.id, resetCode)]);
     assert.equal(tokenBeforeReset.rows[0].used_at, null);
 
-    const expiredToken = `expired-${tag}`;
+    const expiredMember = await createMember('expired');
+    const expiredCode = '000007';
     await pool.query(
       `INSERT INTO email_tokens(user_id, token_hash, purpose, created_at, expires_at)
        VALUES ($1, $2, 'reset_password', now() - interval '2 hours', now() - interval '1 hour')`,
-      [member.id, digest(expiredToken)],
+      [expiredMember.id, digestEmailCode(expiredMember.id, expiredCode)],
     );
     const expiredCheck = await api('/api/auth/reset-password/verify', {
-      method: 'POST', origin: appOrigin, body: { token: expiredToken },
+      method: 'POST', origin: appOrigin, body: { email: expiredMember.email, code: expiredCode },
     });
     assert.equal(expiredCheck.status, 400);
-    assert.equal((await expiredCheck.json()).error.code, 'INVALID_OR_EXPIRED_TOKEN');
+    assert.equal((await expiredCheck.json()).error.code, 'INVALID_OR_EXPIRED_CODE');
 
     const reset = await api('/api/auth/reset-password', {
-      method: 'POST', origin: appOrigin, body: { token: resetToken, password: 'NewSkill9' },
+      method: 'POST', origin: appOrigin, body: { email: member.email, code: resetCode, password: 'NewSkill9' },
     });
     assert.equal(reset.status, 204);
     assert.match(reset.headers.get('set-cookie'), /Max-Age=0/u);
     const consumedCheck = await api('/api/auth/reset-password/verify', {
-      method: 'POST', origin: appOrigin, body: { token: resetToken },
+      method: 'POST', origin: appOrigin, body: { email: member.email, code: resetCode },
     });
     assert.equal(consumedCheck.status, 400);
+    assert.equal((await consumedCheck.json()).error.code, 'INVALID_OR_EXPIRED_CODE');
     const oldSession = await api('/api/me', { cookie: memberCookie });
     assert.equal(oldSession.status, 401);
 
@@ -374,6 +451,19 @@ test('Skill Tree API integration contract', async (t) => {
     const attemptIds = [randomUUID(), randomUUID(), randomUUID()];
     const historyTimestamp = '2026-11-25T10:30:00.123456Z';
     const skillTitle = `Integration ${tag}`;
+    const otherSkillId = `${fixtures.skillId}-history`;
+    fixtures.extraSkillIds.push(otherSkillId);
+    await pool.query(
+      'INSERT INTO skills(id, category_id, title, catalog_version, sort_order) VALUES ($1, $2, $3, 7, 2)',
+      [otherSkillId, fixtures.categoryId, `Other history ${tag}`],
+    );
+    const otherSkillAttemptId = randomUUID();
+    await pool.query(
+      `INSERT INTO quiz_attempts(id, user_id, skill_id, skill_title_snapshot, catalog_version, status, total_questions,
+                                 correct_count, passed, completed_at)
+       VALUES ($1, $2, $3, $4, 7, 'completed', 5, 3, false, $5::timestamptz)`,
+      [otherSkillAttemptId, member.id, otherSkillId, `Other history ${tag}`, '2026-11-25T10:31:00.123456Z'],
+    );
     for (const attemptId of attemptIds) {
       await pool.query(
         `INSERT INTO quiz_attempts(id, user_id, skill_id, skill_title_snapshot, catalog_version, status, total_questions,
@@ -454,7 +544,7 @@ test('Skill Tree API integration contract', async (t) => {
 
     const unauthenticatedHistory = await api('/api/progress/history');
     assert.equal(unauthenticatedHistory.status, 401);
-    const firstPage = await api('/api/progress/history?limit=2', { cookie: memberCookie });
+    const firstPage = await api(`/api/progress/history?skillId=${fixtures.skillId}&limit=2`, { cookie: memberCookie });
     assert.equal(firstPage.status, 200);
     const firstPageData = (await firstPage.json()).data;
     const expectedIds = [...attemptIds].sort().reverse();
@@ -463,12 +553,20 @@ test('Skill Tree API integration contract', async (t) => {
     assert.ok(firstPageData.items.every((item) => item.skillTitle.startsWith('Integration ')));
     assert.ok(firstPageData.nextCursor);
 
-    const secondPage = await api(`/api/progress/history?limit=2&cursor=${encodeURIComponent(firstPageData.nextCursor)}`, { cookie: memberCookie });
+    const secondPage = await api(`/api/progress/history?skillId=${fixtures.skillId}&limit=2&cursor=${encodeURIComponent(firstPageData.nextCursor)}`, { cookie: memberCookie });
     assert.equal(secondPage.status, 200);
     const secondPageData = (await secondPage.json()).data;
     assert.deepEqual(secondPageData.items.map((item) => item.activityId), expectedIds.slice(2));
     assert.equal(secondPageData.nextCursor, null);
     assert.ok(![...firstPageData.items, ...secondPageData.items].some((item) => item.activityId === otherAttemptId));
+    assert.ok(![...firstPageData.items, ...secondPageData.items].some((item) => item.activityId === otherSkillAttemptId));
+    const mismatchedCursorFilter = await api(
+      `/api/progress/history?skillId=${otherSkillId}&cursor=${encodeURIComponent(firstPageData.nextCursor)}`,
+      { cookie: memberCookie },
+    );
+    assert.equal(mismatchedCursorFilter.status, 400);
+    const filteredOtherSkill = await api(`/api/progress/history?skillId=${otherSkillId}`, { cookie: memberCookie });
+    assert.deepEqual((await filteredOtherSkill.json()).data.items.map((item) => item.activityId), [otherSkillAttemptId]);
 
     const invalidLimit = await api('/api/progress/history?limit=0', { cookie: memberCookie });
     assert.equal(invalidLimit.status, 400);
@@ -482,15 +580,31 @@ test('Skill Tree API integration contract', async (t) => {
     assert.equal((await invalidCursor.json()).error.code, 'VALIDATION_ERROR');
   });
 
-  await t.test('C question repository filters demo, draft, deleted and inactive rows; coverage uses five approved questions', async () => {
+  await t.test('C question readiness filters general bank formats and counts only three-choice single questions', async () => {
+    const multiChoiceId = await createQuestion(`Multiple-choice fixture ${tag}`);
+    await pool.query(
+      `UPDATE questions SET answer_mode = 'multiple', correct_choices = '[0,1]'::jsonb WHERE id = $1`,
+      [multiChoiceId],
+    );
+    await pool.query(
+      `INSERT INTO questions(skill_id, prompt, choices, correct_choice, answer_mode, correct_choices,
+                             choice_explanations, explanation, difficulty, status, active)
+       VALUES ($1, $2, '["A","B","C","D"]'::jsonb, 0, 'single', '[0]'::jsonb,
+               '["Correct","Incorrect","Incorrect","Incorrect"]'::jsonb, 'Explanation', 'beginner', 'published', true)`,
+      [fixtures.skillId, `Four-choice fixture ${tag}`],
+    );
     const questions = await listPublishedQuestionsForSkill(pool, fixtures.skillId);
-    assert.equal(questions.length, 5);
-    assert.ok(questions.every((question) => question.correctChoices.length === 1));
+    assert.equal(questions.length, 7);
+    assert.equal(questions.filter((question) => (
+      question.answerMode === 'single' && question.choices.length === 3 && question.correctChoices.length === 1
+    )).length, 5);
 
     const coverage = await getPublishedQuestionCoverage(pool, 5);
     const skillCoverage = coverage.skills.find((skill) => skill.skillId === fixtures.skillId);
-    assert.equal(skillCoverage.publishedQuestionCount, 5);
+    assert.equal(skillCoverage.publishedQuestionCount, 7);
+    assert.equal(skillCoverage.cQuizEligibleQuestionCount, 5);
     assert.equal(skillCoverage.meetsMinimum, true);
+    assert.equal(skillCoverage.meetsCQuizMinimum, true);
     assert.equal(coverage.ready, coverage.skills.every((skill) => skill.meetsMinimum));
     assert.equal((await api(`/api/quiz/questions?skillId=${fixtures.skillId}`)).status, 404);
 
@@ -506,117 +620,32 @@ test('Skill Tree API integration contract', async (t) => {
     );
   });
 
-  await t.test('quiz create and read routes follow idempotency, snapshots and answer secrecy contract', async () => {
-    await pool.query(
-      `UPDATE questions
-       SET answer_mode = 'multiple', correct_choices = '[0,1]'::jsonb
-       WHERE id = (
-         SELECT id FROM questions
-         WHERE skill_id = $1 AND active = true AND status = 'published' AND is_demo = false
-         ORDER BY id LIMIT 1
-       )`,
-      [fixtures.skillId],
-    );
-
-    const idempotencyKey = randomUUID();
-    const createRequest = () => api('/api/quizzes/attempts', {
-      method: 'POST',
-      cookie: memberCookie,
-      origin: appOrigin,
-      headers: { 'Idempotency-Key': idempotencyKey },
-      body: { skillId: fixtures.skillId },
+  await t.test('quiz availability is member-scoped and reports only safe eligibility data', async () => {
+    const available = await api(`/api/skills/${fixtures.skillId}/quiz-availability`, { cookie: memberCookie });
+    assert.equal(available.status, 200);
+    const availableData = (await available.json()).data;
+    assert.deepEqual(availableData, {
+      skillId: fixtures.skillId,
+      available: true,
+      reason: null,
+      missingPrerequisiteSkillIds: [],
+      availableQuestionCount: 5,
+      requiredQuestionCount: 5,
     });
-    const [first, concurrentRetry] = await Promise.all([createRequest(), createRequest()]);
-    assert.deepEqual([first.status, concurrentRetry.status].sort(), [200, 201]);
-    const firstData = (await first.json()).data;
-    const retryData = (await concurrentRetry.json()).data;
-    assert.equal(firstData.attemptId, retryData.attemptId);
-    assert.deepEqual(firstData, retryData);
-    assert.equal(firstData.skillId, fixtures.skillId);
-    assert.equal(firstData.skillTitle, `Integration ${tag}`);
-    assert.equal(firstData.totalQuestions, 5);
-    assert.deepEqual(firstData.questions.map((question) => question.ordinal), [1, 2, 3, 4, 5]);
-    assert.ok(firstData.questions.some((question) => question.answerMode === 'multiple'));
-    assert.ok(firstData.questions.every((question) => question.selectedChoices.length === 0));
-    assert.doesNotMatch(JSON.stringify(firstData), /correctChoice|choiceExplanations|"explanation"|isCorrect/u);
+    assert.doesNotMatch(JSON.stringify(availableData), /prompt|choices|correct/u);
 
-    const storedAttempt = await pool.query(
-      `SELECT skill_title_snapshot AS "skillTitle", idempotency_key::text AS "idempotencyKey",
-              octet_length(idempotency_fingerprint)::int AS "fingerprintBytes"
-       FROM quiz_attempts WHERE id = $1`,
-      [firstData.attemptId],
-    );
-    assert.equal(storedAttempt.rows[0].skillTitle, `Integration ${tag}`);
-    assert.equal(storedAttempt.rows[0].idempotencyKey, idempotencyKey);
-    assert.equal(storedAttempt.rows[0].fingerprintBytes, 32);
+    const insufficient = await api(`/api/skills/${fixtures.extraSkillIds[0]}/quiz-availability`, { cookie: memberCookie });
+    assert.equal(insufficient.status, 200);
+    const insufficientData = (await insufficient.json()).data;
+    assert.equal(insufficientData.available, false);
+    assert.equal(insufficientData.reason, 'INSUFFICIENT_QUESTIONS');
+    assert.equal(insufficientData.availableQuestionCount, 0);
 
-    const reusedKey = await api('/api/quizzes/attempts', {
-      method: 'POST', cookie: memberCookie, origin: appOrigin,
-      headers: { 'Idempotency-Key': idempotencyKey },
-      body: { skillId: `${fixtures.skillId}-different` },
-    });
-    assert.equal(reusedKey.status, 409);
-    assert.equal((await reusedKey.json()).error.code, 'IDEMPOTENCY_KEY_REUSED');
-
-    const missingKey = await api('/api/quizzes/attempts', {
-      method: 'POST', cookie: memberCookie, origin: appOrigin,
-      body: { skillId: fixtures.skillId },
-    });
-    assert.equal(missingKey.status, 400);
-    assert.equal((await missingKey.json()).error.code, 'VALIDATION_ERROR');
-
-    await pool.query(
-      `UPDATE quiz_attempt_questions
-       SET selected_choice = 0, selected_choices = '[0]'::jsonb, answered_at = now()
-       WHERE attempt_id = $1 AND ordinal = 1`,
-      [firstData.attemptId],
-    );
-    const fetched = await api(`/api/quizzes/attempts/${firstData.attemptId}`, { cookie: memberCookie });
-    assert.equal(fetched.status, 200);
-    const fetchedData = (await fetched.json()).data;
-    assert.equal(fetchedData.skillTitle, `Integration ${tag}`);
-    assert.deepEqual(fetchedData.questions[0].selectedChoices, [0]);
-    assert.ok(fetchedData.questions[0].answeredAt);
-    assert.doesNotMatch(JSON.stringify(fetchedData), /correctChoice|choiceExplanations|"explanation"|isCorrect/u);
-
-    const foreignRead = await api(`/api/quizzes/attempts/${firstData.attemptId}`, { cookie: cookieFrom(
-      await api('/api/auth/login', {
-        method: 'POST', origin: appOrigin,
-        body: { email: otherMember.email, password },
-      }),
-      'sid',
-    ) });
-    assert.equal(foreignRead.status, 404);
-    assert.equal((await api(`/api/quizzes/attempts/${firstData.attemptId}`)).status, 401);
-
-    const freshKey = randomUUID();
-    const freshAttempt = await api('/api/quizzes/attempts', {
-      method: 'POST', cookie: memberCookie, origin: appOrigin,
-      headers: { 'Idempotency-Key': freshKey },
-      body: { skillId: fixtures.skillId },
-    });
-    assert.equal(freshAttempt.status, 201);
-    const freshData = (await freshAttempt.json()).data;
-    assert.notEqual(freshData.attemptId, firstData.attemptId);
-    const previousAttemptStillExists = await api(`/api/quizzes/attempts/${firstData.attemptId}`, { cookie: memberCookie });
-    assert.equal(previousAttemptStillExists.status, 200);
-
-    await pool.query(
-      `UPDATE questions SET status = 'draft', active = false
-       WHERE id = (
-         SELECT id FROM questions
-         WHERE skill_id = $1 AND active = true AND status = 'published' AND is_demo = false
-         ORDER BY id LIMIT 1
-       )`,
-      [fixtures.skillId],
-    );
-    const belowMinimum = await api('/api/quizzes/attempts', {
-      method: 'POST', cookie: memberCookie, origin: appOrigin,
-      headers: { 'Idempotency-Key': randomUUID() },
-      body: { skillId: fixtures.skillId },
-    });
-    assert.equal(belowMinimum.status, 409);
-    assert.equal((await belowMinimum.json()).error.code, 'INSUFFICIENT_QUESTIONS');
+    const unauthenticated = await api(`/api/skills/${fixtures.skillId}/quiz-availability`);
+    assert.equal(unauthenticated.status, 401);
+    const unknownSkill = await api('/api/skills/no-such-skill/quiz-availability', { cookie: memberCookie });
+    assert.equal(unknownSkill.status, 404);
+    assert.equal((await unknownSkill.json()).error.code, 'SKILL_NOT_FOUND');
   });
 
   await t.test('admin member actions use admin session and suspend invalidates member session', async () => {
@@ -654,6 +683,37 @@ test('Skill Tree API integration contract', async (t) => {
     });
     assert.equal(restored.status, 200);
     assert.equal((await api('/api/me', { cookie: memberCookie })).status, 401);
+  });
+
+  await t.test('owner can revoke a team account but cannot change its role through the runtime API', async () => {
+    const editorLogin = await api('/api/admin/auth/login', {
+      method: 'POST', origin: appOrigin,
+      body: { username: admin.username, password },
+    });
+    const editorCookie = cookieFrom(editorLogin, 'admin_sid');
+    assert.equal((await api('/api/admin/team', { cookie: editorCookie })).status, 403);
+
+    const ownerLogin = await api('/api/admin/auth/login', {
+      method: 'POST', origin: appOrigin,
+      body: { username: `owner_${tag}`, password },
+    });
+    const ownerCookie = cookieFrom(ownerLogin, 'admin_sid');
+    const team = await api('/api/admin/team', { cookie: ownerCookie });
+    assert.equal(team.status, 200);
+    const teamData = (await team.json()).data;
+    assert.ok(teamData.some((account) => account.id === fixtures.adminId && account.role === 'editor'));
+    assert.equal(JSON.stringify(teamData).includes('passwordHash'), false);
+
+    const roleChange = await api(`/api/admin/team/${fixtures.adminId}`, {
+      method: 'PATCH', cookie: ownerCookie, origin: appOrigin, body: { role: 'owner' },
+    });
+    assert.equal(roleChange.status, 400);
+
+    const disabled = await api(`/api/admin/team/${fixtures.adminId}`, {
+      method: 'PATCH', cookie: ownerCookie, origin: appOrigin, body: { disabled: true },
+    });
+    assert.equal(disabled.status, 200);
+    assert.equal((await api('/api/admin/me', { cookie: editorCookie })).status, 401);
   });
 
   await t.test('member logout revokes the session and clears its cookie', async () => {

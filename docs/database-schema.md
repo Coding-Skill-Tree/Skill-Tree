@@ -21,6 +21,8 @@
 | `008_question_multiple_choice.sql` | 多選答案、選項解析與測驗快照欄位 |
 | `009_question_answer_index_integrity.sql` | 舊完成資料 revision 回填、JSONB 答案索引值域／唯一性 constraints 和正式題庫查詢索引 |
 | `010_learning_history_and_idempotency.sql` | 測驗建立冪等鍵、技能名稱快照、學習歷史唯讀 view、XP Outbox worker lease |
+| `011_admin_roles.sql` | 管理員 `owner`／`editor` 角色及唯一啟用最高管理者限制 |
+| `012_email_reset_codes.sql` | 密碼重設碼失敗次數欄位，限制單一驗證碼最多 5 次錯誤輸入 |
 
 ## 資料表與關聯
 
@@ -29,9 +31,9 @@
 | `users` | Email、密碼雜湊、驗證及停權時間 | A 管理帳號生命週期；E 管理身份 Schema |
 | `member_profiles` | 暱稱、頭像、學習路線、onboarding、角色及等級 | 一位 user 對一筆 profile；會員只能由 `sid` 對應的 user 更新 |
 | `member_sessions` | session token 雜湊、會員及到期時間 | token 只保存雜湊；停權或登出撤銷 session |
-| `email_tokens` | Email 驗證／密碼重設用途、雜湊、到期與使用時間 | token 一次性使用；不保存原始 token |
+| `email_tokens` | 舊 Email 驗證／密碼重設碼用途、HMAC 雜湊、到期、失敗次數與使用時間 | 不保存原始驗證碼；重設碼 10 分鐘有效、一次性使用，錯誤 5 次後失效 |
 | `member_auth_identities` | Google provider subject 與會員關聯 | OAuth 流程尚未實作；此表只記錄已確認的 identity link |
-| `admin_accounts`, `admin_sessions` | 獨立後台帳號與 session | 管理員身份不與會員 session 混用 |
+| `admin_accounts`, `admin_sessions` | 獨立後台帳號與 session | `owner` 為唯一最高管理者；`editor` 為組員角色；管理員身份不與會員 session 混用 |
 | `admin_audit_log` | 管理員動作、目標及 metadata | 會員停權／恢復及題目維護操作留存稽核紀錄 |
 | `auth_rate_limits` | scope、雜湊 subject、失敗數、冷卻與寄送節流 | 不以 Email 明文作 rate-limit key |
 | `skill_categories` | 技能分類名稱、排序、啟用狀態 | B 確認正式分類及排序 |
@@ -85,7 +87,7 @@
 - 正式題庫查詢只取 `active`、`published`、未軟刪除、非展示題，且技能與分類都啟用的題目。
 - 題庫答案索引必須是選項範圍內不重複的整數。資料庫 constraints 與 API 驗證雙重保護；單選相容欄位不可取代 `correct_choices`。
 - `GET /api/skills` 與 `GET /api/progress` 使用相同條件計算 `catalogVersion`。會員 progress 只回目前會員的完成 ID 和 revision。
-- `npm run db:question-coverage` 以每個 active skill 至少 5 道正式題目作檢查；展示 seed 不算正式題庫。
+- `npm run db:question-coverage` 分別列出一般正式題數與 C 首版可用題數；C MVP 技能須至少有 5 道符合其單選三選項規格的題目。官方 MVP `skillId` 清單待 C 確認；展示 seed 不算正式題庫。
 
 ## 測驗、學習歷史與冪等規則
 
@@ -101,8 +103,8 @@
 
 | 操作 | 冪等規則 | 衝突與交易 |
 | --- | --- | --- |
-| 建立測驗 | `POST /api/quizzes/attempts` 必須帶 UUID 格式的 `Idempotency-Key`。資料庫以 `(user_id, idempotency_key)` 唯一；fingerprint 是 canonical 請求本文的 SHA-256 32-byte 值。相同會員、key 和 fingerprint 重送時回傳同一個 attempt 及原題目快照。 | 相同 key 但 fingerprint 不同回 `409 IDEMPOTENCY_KEY_REUSED`。會員 ID 取 session；attempt、五題快照和 key 在同一 transaction 建立。key 隨 attempt 永久保留。 |
-| 儲存答案 | 每題由 `(attempt_id, ordinal)` 唯一定位；相同答案重送只保留同一列，不新增答案列。測驗進行中可改答案，資料列保存最新選取。 | 只有 attempt 所屬會員可寫入；結算完成後答案不可再改，重送回已保存結果或 `409 ATTEMPT_ALREADY_COMPLETED`。 |
+| 建立測驗 | C 的 `POST /api/quizzes/attempts` 必須帶 UUID 格式的 `Idempotency-Key`。資料庫以 `(user_id, idempotency_key)` 唯一；fingerprint 是 canonical 請求本文的 SHA-256 32-byte 值。相同會員、key 和 fingerprint 重送時回傳同一個 attempt 及原題目快照。 | E migration 提供欄位／唯一索引；C PR #93 的首次建立回 `201`，相同 key/body 重送回 `200`；相同 key 但 fingerprint 不同回 `409 IDEMPOTENCY_KEY_CONFLICT`。會員 ID 取 session；attempt、五題快照和 key 在同一 transaction 建立。取消後沿用舊 key 仍回原 `cancelled` attempt；開始新測驗使用新 key。C router 尚待合併至 E app 並做 live DB 整合，詳見[Idempotency-Key 使用說明](idempotency-key-guide.md)。 |
+| 儲存答案 | 每題由 `(attempt_id, ordinal)` 唯一定位；C 確認提交後不可修改，返回前題僅供檢視。 | 答案提交 route 尚待 C 實作；只有 attempt 所屬會員可寫入，完成後不得再改答案。重複提交相同答案的回應仍需由 C route 契約明確定義。 |
 | 結算測驗 | 交易鎖定 attempt，只允許 `in_progress → completed` 一次；分數以資料庫快照和已保存答案重算。重送結算回傳既有結果，不重新判分。 | 完成狀態、分數、永久完成紀錄、revision 和首通 XP event 在同一 transaction 提交，避免只寫入其中一部分。 |
 | 建立首通 XP event | 只在 `user_skill_completions` 首次插入成功時呼叫 `enqueueSkillFirstPassXpEvent()`。event 自帶 UUID，固定 `source_type=quiz_attempt`、`source_id=attemptId`、`event_type=skill.first_pass`，payload 含 `skillId`、`attemptId`、`catalogVersion`、`completedAt`。 | 同自然鍵的同 payload 視為重送；同自然鍵但 user／skill／來源資料不一致屬資料衝突，不覆寫舊 event。事件與首次完成在同一 transaction。 |
 | 消費 XP event | D 以 `FOR UPDATE SKIP LOCKED` claim；每次 claim 寫入隨機 `lease_token` 和到期時間。確認、失敗回報都必須比對當前 lease token。 | lease 過期可重領；舊 worker 因 token 不同不能確認新 worker 的工作。實際加分與標記 event completed 同一 transaction，`xp_ledger.event_id` 唯一，重送不重複加分。 |
@@ -111,7 +113,7 @@ XP Outbox 是「首通事件」，不預先假設獎勵點數。新事件的 `am
 
 Outbox 消費端讀取欄位時組成 `{ eventId, userId, sourceType, sourceId, eventType, payload }`；`userId` 來自資料列，payload 僅含 `skillId`、`attemptId`、`catalogVersion`、`completedAt`。會員 Email、姓名、cookie、答案和題目正解不進入事件 payload。
 
-Worker 每次 claim 都增加 `attempts`。第一次立即處理；失敗後採 full-jitter 指數退避，延遲上限為 1 小時，最多 claim 12 次。到達上限後保留為 `failed` 供管理員檢查；人工重試需清楚地重設次數並重新排程。過期 processing lease 若已到上限，只能回收並標為 terminal failed，不再執行發獎。
+Worker 每次 claim 都增加 `attempts`。D 尚需和 E 定案重試間隔、lease 長度與最大嘗試次數；目前的候選方案是 full-jitter 指數退避（5 秒起、上限 1 小時）、最多 claim 12 次。定案前，候選值不可視為正式契約。到達上限的事件須保留供管理員檢查；過期 processing lease 若已到上限，不再自動執行發獎。
 
 `quiz_attempts_completed_result_required` 以 `NOT VALID` 加入，確保新建立或更新成 completed 的 attempt 一定有完成時間、答對數和通過結果；舊資料不會因 migration 自動中斷。正式驗收前需盤點舊 completed rows，再修復或驗證此 constraint。
 
@@ -127,5 +129,5 @@ Worker 每次 claim 都增加 `attempts`。第一次立即處理；失敗後採 
 
 - B 已確認標準識別名稱為 `skillId`；正式技能清單、分類、排序、目錄版本更新方式及停用技能的進度顯示仍由 B 提供。
 - C 負責在共用 Express 實作測驗 endpoints；必須遵守本文件的 attempt 快照、答案不可外洩、結算交易和建立冪等 key 規則。
-- D 負責 XP event 消費、獎勵金額、重試上限／間隔、等級計算及展示欄位；Outbox 已提供 lease 與 fencing 欄位。
-- A 確認會員 profile 欄位與註冊、Email 驗證、onboarding 及密碼重設畫面行為。
+- D 負責 XP event 消費、獎勵金額、重試上限／間隔、等級計算及展示欄位；Outbox 已提供 lease 與 fencing 欄位。`member_profiles.level` 目前只有預設值 `1`，尚無等級門檻資料；目前也沒有成就定義／取得紀錄表。需要這些資料時由 D 提 migration 與唯一性規則，避免拿既有表存放不同業務概念。
+- A 確認會員 profile 欄位、註冊後直接進 onboarding、歡迎信及密碼重設畫面行為。新註冊不經 Email 驗證連結。

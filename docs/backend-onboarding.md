@@ -54,6 +54,8 @@ cp backend/.env.example backend/.env
 DATABASE_URL=postgresql://skill_tree_app:<本機自訂密碼>@127.0.0.1:5432/skill_tree_dev
 ```
 
+正式環境要把 `DATABASE_URL` 設為低權限執行帳號，把 `DATABASE_MIGRATION_URL` 設為只供部署／帳號建立的遷移帳號；正式環境還必須開啟 `DATABASE_SSL=true`。角色 SQL 與部署步驟請依[安全檢查與部署規則](security-review.md)執行。
+
 如果 PostgreSQL 在其他連接埠，請把 `5432` 換成實際值。若密碼含 URI 保留字，需先做 URL encoding。`.env` 不會提交到 Git，請勿把密碼放進 PR、程式碼或截圖。
 
 ## 2. 安裝套件、建立 schema 和示範資料
@@ -65,7 +67,7 @@ npm ci
 npm --prefix backend ci
 npm run db:migrate
 npm run db:seed
-npm run admin:create -- test
+npm run admin:create -- your_name owner
 ```
 
 `db:migrate` 依序套用尚未執行的 migration；重跑時已套用的檔案會略過。`db:seed` 載入本機示範分類、技能和題目，不會建立共用帳密。`admin:create` 會在終端機隱藏密碼輸入；密碼需 12 到 72 個字，包含英文字母和數字。每位組員使用自己的本機密碼。
@@ -125,9 +127,9 @@ ORDER BY updated_at DESC;
 
 `GET /api/skills` 提供公開技能目錄；以 `skillId` 作為技能識別欄位，並回傳 `catalogVersion`、分類、學習項目、座標和 `prerequisiteSkillIds`。`GET /api/progress` 需登入，回傳同一組 `skillId` 值作為 `completedSkillIds`，B 負責依完成狀態呈現節點，D 負責進度統計。
 
-會員個人資料和 onboarding 使用 `GET /api/me` 與 `PATCH /api/me/profile`；兩者都以 `sid` session 決定會員身份。忘記密碼使用 `POST /api/auth/forgot-password`，不論 Email 是否註冊都回傳相同訊息；重設頁先呼叫 `POST /api/auth/reset-password/verify` 確認 token，再由 `POST /api/auth/reset-password` 消耗 token 並重設密碼。
+會員個人資料和 onboarding 使用 `GET /api/me` 與 `PATCH /api/me/profile`；兩者都以 `sid` session 決定會員身份。新註冊建立後寄送歡迎信，不寄 Email 驗證信。忘記密碼使用 `POST /api/auth/forgot-password`，不論 Email 是否註冊都回傳相同訊息；已註冊帳號會收到六位數驗證碼。重設頁以 Email、驗證碼及新密碼呼叫 `POST /api/auth/reset-password`；驗證碼 10 分鐘有效、成功使用一次，最多允許 5 次錯誤輸入，成功後撤銷該會員所有 sessions。`POST /api/auth/reset-password/verify` 可先檢查碼但不消耗它。
 
-C 的測驗路由應在伺服器內呼叫 E 提供的題庫資料服務及 `recordSkillCompletion()`；不要把正解送進瀏覽器，也不要新增可由用戶端指定 `userId` 的完成紀錄 API。每個啟用技能至少需要 5 道正式發布、非示範、未刪除的題目，可用 `npm run db:question-coverage` 檢查。正式課程題由 B/C 確認提供。
+C 的測驗路由應在伺服器內呼叫 E 提供的題庫資料服務及 `recordSkillCompletion()`；不要把正解送進瀏覽器，也不要新增可由用戶端指定 `userId` 的完成紀錄 API。C 首版的每個 MVP 技能至少需要 5 道正式發布、非示範、未刪除、三選一單選的題目，可用 `npm run db:question-coverage` 查看一般題數和 C 可用題數。正式技能清單與課程題由 B/C 確認提供。
 
 ## 5. API 路由與共同格式
 
@@ -138,10 +140,10 @@ C 的測驗路由應在伺服器內呼叫 E 提供的題庫資料服務及 `reco
 1. 點右上角「檢查 API」，確認 HTTP 200 且資料庫為 connected。
 2. 從左側搜尋或分類選端點；右側可填路徑／查詢參數與 JSON 本文，按「送出請求」後查看實際狀態、耗時、headers 和 response body。
 3. 試會員流程時先選 POST /api/auth/login；試後台流程時先選 POST /api/admin/auth/login。成功後瀏覽器會自動保存 HttpOnly cookie，後續呼叫會自動附上，不要手動複製或輸入 cookie。
-4. 從只讀 API 開始，例如 GET /api/me、GET /api/skills、GET /api/admin/members 或 GET /api/admin/questions。驗證 Email 和密碼重設需要本機信箱服務寄來的一次性 token。
+4. 從只讀 API 開始，例如 GET /api/me、GET /api/skills、GET /api/admin/members 或 GET /api/admin/questions。密碼重設需要本機信箱服務寄來的六位數驗證碼；若本機 SMTP 未設定，API 終端機會顯示測試寄送內容。
 5. POST /api/admin/questions、PUT、DELETE 以及會員停權／恢復會變更資料；請使用自己的本機開發資料庫和測試帳號，不要對共用或正式資料執行。
 
-題庫管理 API 會回傳正解，僅供管理員使用；不要把該回應當成學生作答 API。C 的 `POST /api/quizzes/attempts` 和 `GET /api/quizzes/attempts/:attemptId` 已接到共用 Express 和 API Explorer；答案提交、結算及測驗歷史 routes 仍待 C 完成。題庫查詢、完成紀錄和 XP Outbox 服務是 backend-only，不會開成通用瀏覽器端點。會員的 `GET /api/progress/history` 已納入 Explorer，讀取已完成測驗的學習歷史投影。各模組採用的共用欄位、身份和資料責任仍以[API 契約](api-contract.md)為準。
+題庫管理 API 會回傳正解，僅供管理員使用；不要把該回應當成學生作答 API。C 的建立／讀題 routes 在 PR #93，尚未接入此 E branch 的共用 Express；答案提交與結算 routes 也仍待 C 完成。會員可用 `GET /api/skills/{skillId}/quiz-availability` 檢查先修狀態和合格題數；建立測驗時 C 的 POST 仍須在 transaction 內重驗。題庫查詢、完成紀錄和 XP Outbox services 是 backend-only，不開成通用瀏覽器寫入端點。會員的 `GET /api/progress/history?skillId=...` 已納入 Explorer，讀取已完成測驗的學習歷史投影。建立測驗時，新的操作使用新 UUID `Idempotency-Key`；網路結果不確定時，重試要沿用同一 key 和同一 `skillId`，詳見[操作說明](idempotency-key-guide.md)。各模組採用的共用欄位、身份和資料責任仍以[API 契約](api-contract.md)為準。
 
 本機還提供只讀的[前後端開發工作台](http://localhost:5173/workbench)：它會顯示 API/資料庫健康狀態、OpenAPI 端點、migration 套用清單，以及固定白名單內的程式碼。若要實際呼叫 API，使用 `/api/docs`；工作台不會建立或修改資料。
 
@@ -155,7 +157,7 @@ C 的測驗路由應在伺服器內呼叫 E 提供的題庫資料服務及 `reco
 | A10 會員詳情與狀態 | `GET /api/admin/members/:id`、`POST /api/admin/members/:id/suspend`、`POST /api/admin/members/:id/restore` |
 | 會員個人資料、onboarding | `GET /api/me`、`PATCH /api/me/profile` |
 | 會員學習歷史 | `GET /api/progress/history` |
-| 忘記密碼與重設密碼 | `POST /api/auth/forgot-password`、`POST /api/auth/reset-password/verify`、`POST /api/auth/reset-password` |
+| 忘記密碼與重設密碼 | `POST /api/auth/forgot-password`、`POST /api/auth/reset-password/verify`、`POST /api/auth/reset-password`；使用六位數驗證碼 |
 | 會員學習進度讀取 | `GET /api/progress` |
 
 成功回應格式：
@@ -199,6 +201,6 @@ erDiagram
 ## 常見問題
 
 - `DATABASE_UNAVAILABLE`：確認 PostgreSQL 正在執行、`DATABASE_URL` 的主機／連接埠／資料庫／帳密正確，並重跑 `npm run db:migrate`。
-- `ADMIN_UNAUTHENTICATED`：先用本機管理員帳號登入 `/admin`；若本機尚無管理員，執行 `npm run admin:create -- <帳號>`。
+- `ADMIN_UNAUTHENTICATED`：先用本機管理員帳號登入 `/admin`；若尚未建立最高管理者，執行 `npm run admin:create -- <你的帳號> owner`。
 - `ORIGIN_NOT_ALLOWED`：將瀏覽器實際使用的前端網址加入 `APP_ORIGINS`，再重啟 API。
 - Node 套件錯誤：根目錄和 `backend` 各有一份 lockfile，兩邊都要分別執行 `npm ci`。

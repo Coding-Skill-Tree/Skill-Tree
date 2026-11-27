@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { skills } from "./data/skills.js";
 import {
   allNodes,
@@ -16,8 +16,8 @@ import TaskPanel from "./components/TaskPanel.jsx";
 import LearningDialog from "./components/LearningDialog.jsx";
 import "./style.css";
 
-export default function App() {
-  const { progress, storageError, start, complete, reset } = useProgress();
+export default function App({ readOnly = false }) {
+  const { progress, storageError, start, complete, reset } = useProgress({ readOnly });
   const [activeSkill, setActiveSkill] = useState("html");
   const [selectedBySkill, setSelectedBySkill] = useState({});
   const [view, setView] = useState("map");
@@ -41,11 +41,13 @@ export default function App() {
       );
   }
   function openLearning() {
+    if (readOnly) return;
     if (status === "locked") return;
     start(node.id);
     setSessionId(node.id);
   }
   function finishLearning() {
+    if (readOnly) return;
     if (
       !sessionId ||
       getStatus(nodeById.get(sessionId), progress) !== "in-progress"
@@ -78,13 +80,13 @@ export default function App() {
             <h1>選擇前端學習技能</h1>
             <p>挑選一個你想精進的前端技能，展開專屬的學習地圖。</p>
           </div>
-          <div className="header-actions">
+          {!readOnly && <div className="header-actions">
             <button type="button" className="reset-small" onClick={resetDemo}>
               重設進度
             </button>
-          </div>
+          </div>}
         </header>
-        <p className="demo-banner">開發測試版 · 示範通關 / 本機進度儲存</p>
+        <p className="demo-banner">{readOnly ? "訪客展示模式 · 唯讀合成資料，不會儲存進度" : "開發測試版 · 示範通關 / 本機進度儲存"}</p>
         {storageError && (
           <p className="storage-warning" role="alert">
             瀏覽器儲存空間無法寫入，重新整理可能遺失進度。
@@ -116,6 +118,7 @@ export default function App() {
             onStart={openLearning}
             hasNext={Boolean(upcoming)}
             onNext={() => upcoming && selectNode(upcoming.id)}
+          readOnly={readOnly}
           />
         </div>
         <p className="sr-only" role="status">

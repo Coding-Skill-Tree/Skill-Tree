@@ -21,13 +21,13 @@
   </defs>
   <rect width="1440" height="700" rx="24" fill="#ffffff" />
   <text x="56" y="62" class="title">本機開發工作台</text>
-  <text x="56" y="92" class="sub">以現有 OpenAPI 和固定原始碼白名單連起畫面、API、程式與資料庫狀態</text>
+  <text x="56" y="92" class="sub">以現有 OpenAPI 和固定原始碼白名單連起 A–D 畫面、API、程式與資料庫狀態</text>
 
   <rect x="56" y="150" width="300" height="230" rx="18" class="view" />
   <text x="82" y="191" class="head">React 工作台 UI</text>
   <text x="82" y="226" class="body">/workbench · Vite 開發模式</text>
-  <text x="82" y="262" class="body">資料流節點與程式碼檢視</text>
-  <text x="82" y="298" class="body">API 路由和 migration 狀態</text>
+  <text x="82" y="262" class="body">會員／目錄／測驗／管理 API 篩選</text>
+  <text x="82" y="298" class="body">資料流節點和白名單程式碼導覽</text>
   <text x="82" y="348" class="small">純文字呈現；不執行讀取到的程式碼</text>
 
   <rect x="430" y="150" width="425" height="230" rx="18" class="api" />
@@ -42,7 +42,7 @@
   <text x="956" y="191" class="head">固定資料來源</text>
   <text x="956" y="226" class="body">OpenAPI JSON · 已註冊 endpoints</text>
   <text x="956" y="254" class="body">schema_migrations · 名稱與套用時間</text>
-  <text x="956" y="282" class="body">固定 allowlist · 精選原始碼檔案</text>
+  <text x="956" y="282" class="body">固定 allowlist · A–D routes/services/migrations</text>
   <text x="956" y="348" class="small">讀檔限專案內白名單，單檔上限 48 KiB</text>
 
   <path d="M356 266H430" class="arrow" />

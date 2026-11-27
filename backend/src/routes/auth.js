@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { pool } from '../db/pool.js';
 import { requireMember } from '../middleware/require-member.js';
 import { HttpError, validationError } from '../lib/http-error.js';
@@ -7,8 +7,9 @@ import { sendSuccess } from '../lib/api-response.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { isValidEmail, normalizeEmail, validateLogin, validateMemberProfile, validateNewPassword, validateRegistration } from '../lib/validation.js';
 import { assertLoginNotBlocked, clearLoginFailures, hashRateLimitSubject, recordLoginFailure } from '../services/auth-rate-limit.js';
-import { sendPasswordResetEmail, sendVerificationEmail } from '../services/email-service.js';
-import { clearMemberSessionCookie, createMemberSession, revokeMemberSession } from '../services/session-service.js';
+import { sendPasswordResetCodeEmail, sendWelcomeEmail } from '../services/email-service.js';
+import { digestEmailCode, EMAIL_CODE_MAX_ATTEMPTS, EMAIL_CODE_TTL_MINUTES, generateEmailCode } from '../services/email-code.js';
+import { clearMemberSessionCookie, createMemberSession, createMemberSessionRecord, revokeMemberSession } from '../services/session-service.js';
 
 export const authRouter = Router();
 
@@ -35,28 +36,53 @@ function tokenDigest(token) {
   return createHash('sha256').update(token).digest('hex');
 }
 
+const INVALID_RESET_CODE = () => new HttpError(400, 'INVALID_OR_EXPIRED_CODE', '驗證碼無效、已過期或已達輸入次數上限');
+
+async function lockResetCode(client, email, code) {
+  const result = await client.query(
+    `SELECT et.id, et.user_id AS "userId", et.token_hash AS "tokenHash",
+            et.attempt_count AS "attemptCount"
+     FROM users u JOIN email_tokens et ON et.user_id = u.id
+     WHERE u.email_normalized = $1 AND et.purpose = 'reset_password'
+       AND et.used_at IS NULL AND et.expires_at > now()
+     ORDER BY et.created_at DESC
+     LIMIT 1 FOR UPDATE OF et`,
+    [email],
+  );
+  const resetCode = result.rows[0];
+  if (!resetCode || resetCode.attemptCount >= EMAIL_CODE_MAX_ATTEMPTS) return null;
+
+  const actual = Buffer.from(resetCode.tokenHash, 'hex');
+  const expected = Buffer.from(digestEmailCode(resetCode.userId, code), 'hex');
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    await client.query('UPDATE email_tokens SET attempt_count = attempt_count + 1 WHERE id = $1', [resetCode.id]);
+    return null;
+  }
+  return resetCode;
+}
+
 authRouter.post('/auth/register', async (request, response, next) => {
   const email = normalizeEmail(request.body?.email);
   const password = request.body?.password;
   try {
     validateRegistration(email, password);
     const passwordHash = await hashPassword(password);
-    const verificationToken = randomBytes(32).toString('base64url');
     const client = await pool.connect();
     let userId;
+    let member;
+    let session;
     try {
       await client.query('BEGIN');
       const userResult = await client.query(
-        'INSERT INTO users(email_normalized, password_hash) VALUES ($1, $2) RETURNING id',
+        `INSERT INTO users(email_normalized, password_hash, email_verified_at)
+         VALUES ($1, $2, now())
+         RETURNING id, email_normalized AS email, created_at AS "createdAt"`,
         [email, passwordHash],
       );
-      userId = userResult.rows[0].id;
+      member = userResult.rows[0];
+      userId = member.id;
       await client.query('INSERT INTO member_profiles(user_id) VALUES ($1)', [userId]);
-      await client.query(
-        `INSERT INTO email_tokens(user_id, token_hash, purpose, expires_at)
-         VALUES ($1, $2, 'verify_email', now() + interval '24 hours')`,
-        [userId, tokenDigest(verificationToken)],
-      );
+      session = await createMemberSessionRecord(client, userId);
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
@@ -68,15 +94,26 @@ authRouter.post('/auth/register', async (request, response, next) => {
       client.release();
     }
 
+    session.attachCookie(response);
     try {
-      await sendVerificationEmail({ to: email, token: verificationToken });
+      await sendWelcomeEmail({ to: email });
     } catch (error) {
-      console.error('Verification email delivery failed', {
+      console.error('Welcome email delivery failed', {
         requestId: response.locals.requestId,
         message: error.message,
       });
     }
-    sendSuccess(response, { email }, 201);
+    sendSuccess(response, {
+      ...memberPayload({
+        ...member,
+        nickname: null,
+        avatarId: null,
+        route: null,
+        onboardingCompleted: false,
+        hasPassword: true,
+      }),
+      nextStep: '/onboarding',
+    }, 201);
   } catch (error) {
     next(error);
   }
@@ -154,7 +191,7 @@ authRouter.post('/auth/login', async (request, response, next) => {
 
 authRouter.post('/auth/forgot-password', async (request, response, next) => {
   const email = normalizeEmail(request.body?.email);
-  const genericMessage = '若此 Email 已註冊，我們已寄出重設密碼的連結';
+  const genericMessage = '若此 Email 已註冊，我們已寄出密碼重設驗證碼';
   if (!isValidEmail(email)) {
     return next(validationError({ email: '請輸入有效的 Email' }));
   }
@@ -163,7 +200,7 @@ authRouter.post('/auth/forgot-password', async (request, response, next) => {
     const userResult = await pool.query('SELECT id FROM users WHERE email_normalized = $1', [email]);
     if (userResult.rows[0]) {
       const subjectHash = hashRateLimitSubject('password_reset', email);
-      const resetToken = randomBytes(32).toString('base64url');
+      const resetCode = generateEmailCode();
       const client = await pool.connect();
       let shouldSend = false;
       try {
@@ -186,8 +223,8 @@ authRouter.post('/auth/forgot-password', async (request, response, next) => {
           );
           await client.query(
             `INSERT INTO email_tokens(user_id, token_hash, purpose, expires_at)
-             VALUES ($1, $2, 'reset_password', now() + interval '1 hour')`,
-            [userResult.rows[0].id, tokenDigest(resetToken)],
+             VALUES ($1, $2, 'reset_password', now() + make_interval(mins => $3::int))`,
+            [userResult.rows[0].id, digestEmailCode(userResult.rows[0].id, resetCode), EMAIL_CODE_TTL_MINUTES],
           );
         }
         await client.query('COMMIT');
@@ -200,9 +237,9 @@ authRouter.post('/auth/forgot-password', async (request, response, next) => {
 
       if (shouldSend) {
         try {
-          await sendPasswordResetEmail({ to: email, token: resetToken });
+          await sendPasswordResetCodeEmail({ to: email, code: resetCode });
         } catch (error) {
-          console.error('Password reset email delivery failed', {
+          console.error('Password reset code email delivery failed', {
             requestId: response.locals.requestId,
             message: error.message,
           });
@@ -216,17 +253,23 @@ authRouter.post('/auth/forgot-password', async (request, response, next) => {
 });
 
 authRouter.post('/auth/reset-password/verify', async (request, response, next) => {
-  const token = typeof request.body?.token === 'string' ? request.body.token : '';
+  const email = normalizeEmail(request.body?.email);
+  const code = typeof request.body?.code === 'string' ? request.body.code : '';
   try {
-    if (!token || token.length > 256) {
-      throw new HttpError(400, 'INVALID_OR_EXPIRED_TOKEN', '重設連結無效或已過期');
+    if (!isValidEmail(email) || !/^\d{6}$/u.test(code)) throw INVALID_RESET_CODE();
+    const client = await pool.connect();
+    let valid = false;
+    try {
+      await client.query('BEGIN');
+      valid = Boolean(await lockResetCode(client, email, code));
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
     }
-    const result = await pool.query(
-      `SELECT 1 FROM email_tokens
-       WHERE token_hash = $1 AND purpose = 'reset_password' AND used_at IS NULL AND expires_at > now()`,
-      [tokenDigest(token)],
-    );
-    if (!result.rowCount) throw new HttpError(400, 'INVALID_OR_EXPIRED_TOKEN', '重設連結無效或已過期');
+    if (!valid) throw INVALID_RESET_CODE();
     response.status(204).end();
   } catch (error) {
     next(error);
@@ -234,41 +277,39 @@ authRouter.post('/auth/reset-password/verify', async (request, response, next) =
 });
 
 authRouter.post('/auth/reset-password', async (request, response, next) => {
-  const token = typeof request.body?.token === 'string' ? request.body.token : '';
+  const email = normalizeEmail(request.body?.email);
+  const code = typeof request.body?.code === 'string' ? request.body.code : '';
   const newPassword = request.body?.password;
   try {
     validateNewPassword(newPassword, 'password');
-    if (!token || token.length > 256) throw new HttpError(400, 'INVALID_OR_EXPIRED_TOKEN', '重設連結無效或已過期');
+    if (!isValidEmail(email) || !/^\d{6}$/u.test(code)) throw INVALID_RESET_CODE();
 
     const client = await pool.connect();
+    let valid = false;
     try {
       await client.query('BEGIN');
-      const tokenResult = await client.query(
-        `SELECT id, user_id FROM email_tokens
-         WHERE token_hash = $1 AND purpose = 'reset_password' AND used_at IS NULL AND expires_at > now()
-         FOR UPDATE`,
-        [tokenDigest(token)],
-      );
-      const resetToken = tokenResult.rows[0];
-      if (!resetToken) throw new HttpError(400, 'INVALID_OR_EXPIRED_TOKEN', '重設連結無效或已過期');
-
-      const passwordHash = await hashPassword(newPassword);
-      await client.query(
-        `UPDATE users SET password_hash = $1, email_verified_at = COALESCE(email_verified_at, now()), updated_at = now()
-         WHERE id = $2`,
-        [passwordHash, resetToken.user_id],
-      );
-      await client.query('UPDATE email_tokens SET used_at = now() WHERE id = $1', [resetToken.id]);
-      await client.query('DELETE FROM member_sessions WHERE user_id = $1', [resetToken.user_id]);
+      const resetCode = await lockResetCode(client, email, code);
+      if (resetCode) {
+        const passwordHash = await hashPassword(newPassword);
+        await client.query(
+          `UPDATE users SET password_hash = $1, email_verified_at = COALESCE(email_verified_at, now()), updated_at = now()
+           WHERE id = $2`,
+          [passwordHash, resetCode.userId],
+        );
+        await client.query('UPDATE email_tokens SET used_at = now() WHERE id = $1', [resetCode.id]);
+        await client.query('DELETE FROM member_sessions WHERE user_id = $1', [resetCode.userId]);
+        valid = true;
+      }
       await client.query('COMMIT');
-      clearMemberSessionCookie(response);
-      response.status(204).end();
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
-      next(error);
+      throw error;
     } finally {
       client.release();
     }
+    if (!valid) throw INVALID_RESET_CODE();
+    clearMemberSessionCookie(response);
+    response.status(204).end();
   } catch (error) {
     next(error);
   }

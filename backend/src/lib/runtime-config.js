@@ -52,16 +52,36 @@ function originSetting() {
   return origins;
 }
 
+function databaseSslSetting() {
+  const enabled = booleanSetting('DATABASE_SSL', false);
+  if (process.env.NODE_ENV === 'production' && !enabled) {
+    throw new Error('正式環境必須設定 DATABASE_SSL=true');
+  }
+  return enabled;
+}
+
+function emailCodeSecretSetting() {
+  const secret = process.env.EMAIL_CODE_SECRET || '';
+  if (process.env.NODE_ENV === 'production' && secret.length < 32) {
+    throw new Error('正式環境必須設定至少 32 個字元的 EMAIL_CODE_SECRET');
+  }
+  return secret || 'local-development-only-email-code-secret';
+}
+
 export const runtimeConfig = Object.freeze({
   nodeEnv: nodeEnvSetting(),
   port: integerSetting('PORT', 3000, 1, 65535),
   databasePoolMax: integerSetting('DB_POOL_MAX', 10, 1, 100),
+  trustProxyHops: integerSetting('TRUST_PROXY_HOPS', 0, 0, 5),
+  apiRateLimitRequests: integerSetting('API_RATE_LIMIT_REQUESTS', 300, 1, 100000),
+  authRateLimitRequests: integerSetting('AUTH_RATE_LIMIT_REQUESTS', 20, 1, 10000),
   sessionTtlDays: integerSetting('SESSION_TTL_DAYS', 15, 1, 365),
   adminSessionTtlHours: integerSetting('ADMIN_SESSION_TTL_HOURS', 8, 1, 168),
   loginMaxFailures: integerSetting('LOGIN_MAX_FAILURES', 5, 1, 100),
   loginFailureWindowMinutes: integerSetting('LOGIN_FAILURE_WINDOW_MINUTES', 15, 1, 1440),
   loginCooldownMinutes: integerSetting('LOGIN_COOLDOWN_MINUTES', 5, 1, 1440),
   sessionCookieSecure: booleanSetting('SESSION_COOKIE_SECURE', false),
-  databaseSsl: booleanSetting('DATABASE_SSL', false),
   appOrigins: originSetting(),
+  databaseSsl: databaseSslSetting(),
+  emailCodeSecret: emailCodeSecretSetting(),
 });

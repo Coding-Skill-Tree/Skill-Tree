@@ -2,8 +2,30 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { sendSuccess } from '../lib/api-response.js';
 import { readActiveCatalogVersion } from '../services/progress-service.js';
+import { requireMember } from '../middleware/require-member.js';
+import { HttpError, validationError } from '../lib/http-error.js';
+import { getQuizAvailability } from '../services/question-bank.js';
 
 export const skillsRouter = Router();
+
+skillsRouter.get('/skills/:skillId/quiz-availability', requireMember, async (request, response, next) => {
+  const { skillId } = request.params;
+  if (!skillId || skillId.length > 80 || skillId !== skillId.trim()) {
+    return next(validationError({ skillId: '技能 ID 必須是 1 到 80 個字元，且不可包含前後空白' }));
+  }
+  try {
+    const availability = await getQuizAvailability(pool, {
+      userId: request.member.id,
+      skillId,
+    });
+    if (availability.reason === 'SKILL_NOT_FOUND') {
+      return next(new HttpError(404, 'SKILL_NOT_FOUND', '技能不存在或已停用'));
+    }
+    return sendSuccess(response, availability);
+  } catch (error) {
+    return next(error);
+  }
+});
 
 skillsRouter.get('/skills', async (_request, response, next) => {
   const client = await pool.connect();

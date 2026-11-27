@@ -33,39 +33,38 @@ export function validateEmailRuntime() {
 function getTransporter() {
   if (transporter) return transporter;
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD } = smtpValues();
+  const secure = process.env.SMTP_SECURE === 'true' || Number(SMTP_PORT || 587) === 465;
   transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port: Number(SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true' || Number(SMTP_PORT || 587) === 465,
+    secure,
+    requireTLS: process.env.NODE_ENV === 'production' && !secure,
     auth: { user: SMTP_USER, pass: SMTP_PASSWORD },
   });
   return transporter;
 }
 
-export async function sendVerificationEmail({ to, token }) {
-  const verificationUrl = new URL('/verify-email', process.env.PUBLIC_APP_URL || 'http://localhost:5173');
-  verificationUrl.searchParams.set('token', token);
-  const subject = 'Skill Tree 註冊成功，請驗證 Email';
-  const text = `請在 24 小時內完成 Email 驗證：\n${verificationUrl.toString()}`;
+export async function sendWelcomeEmail({ to }) {
+  const subject = '歡迎加入 Skill Tree';
+  const text = '你的 Skill Tree 帳號已建立，歡迎開始探索技能樹。';
   const { SMTP_HOST, SMTP_FROM } = smtpValues();
 
   if (!SMTP_HOST && process.env.NODE_ENV !== 'production') {
-    console.info('[DEV EMAIL]', JSON.stringify({ to, subject, verificationUrl: verificationUrl.toString() }));
+    console.info('[DEV EMAIL]', JSON.stringify({ to, subject, text }));
     return;
   }
 
   await getTransporter().sendMail({ from: SMTP_FROM, to, subject, text });
 }
 
-export async function sendPasswordResetEmail({ to, token }) {
+export async function sendPasswordResetCodeEmail({ to, code }) {
   const resetUrl = new URL('/reset-password', process.env.PUBLIC_APP_URL || 'http://localhost:5173');
-  resetUrl.searchParams.set('token', token);
-  const subject = '重設你的密碼';
-  const text = `請在 1 小時內使用此連結重設密碼：\n${resetUrl.toString()}`;
+  const subject = 'Skill Tree 密碼重設驗證碼';
+  const text = `你的密碼重設驗證碼是：${code}\n請在 10 分鐘內前往以下頁面，輸入註冊 Email、驗證碼並設定新密碼：\n${resetUrl.toString()}\n若你沒有提出申請，請忽略此信。`;
   const { SMTP_HOST, SMTP_FROM } = smtpValues();
 
   if (!SMTP_HOST && process.env.NODE_ENV !== 'production') {
-    console.info('[DEV EMAIL]', JSON.stringify({ to, subject, resetUrl: resetUrl.toString() }));
+    console.info('[DEV EMAIL]', JSON.stringify({ to, subject, code, resetUrl: resetUrl.toString() }));
     return;
   }
 

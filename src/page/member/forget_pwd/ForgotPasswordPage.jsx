@@ -52,10 +52,12 @@ function ForgotPasswordPage() {
     }
   }
 
-  // 關閉後焦點回到送出按鈕（由 Modal 的 returnFocusRef 處理），Email 保留
+  // Modal 的 returnFocusRef 會在關閉時把焦點放回送出按鈕；Email 保留。
   function closeSentDialog() {
     setSentOpen(false);
   }
+
+  const resetHref = "/reset-password";
 
   return (
     <div className="auth-page">
@@ -103,9 +105,9 @@ function ForgotPasswordPage() {
             {FORGOT_TEXT.sentMessage}
           </p>
           <div className="modal-actions">
-            <button type="button" className="btn btn-primary" onClick={closeSentDialog} autoFocus>
+            <a className="btn btn-primary" href={resetHref} autoFocus>
               {FORGOT_TEXT.sentConfirm}
-            </button>
+            </a>
           </div>
         </div>
       </Modal>

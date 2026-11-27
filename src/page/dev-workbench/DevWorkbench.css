@@ -269,6 +269,42 @@
   margin-bottom: 16px;
 }
 
+.workbench-api-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 14px;
+}
+
+.workbench-api-filters button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--workbench-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 0 11px;
+}
+
+.workbench-api-filters button:hover,
+.workbench-api-filters button:focus-visible,
+.workbench-api-filters button.is-active {
+  border-color: rgba(198, 243, 106, 0.5);
+  background: rgba(198, 243, 106, 0.08);
+  color: var(--color-primary);
+  outline: none;
+}
+
+.workbench-api-filters button span {
+  color: var(--color-text-subtle);
+  font-size: 10px;
+}
+
 .workbench-endpoint-list,
 .workbench-migration-list {
   display: grid;

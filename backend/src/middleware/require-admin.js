@@ -10,7 +10,7 @@ export async function requireAdmin(request, _response, next) {
 
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const { rows } = await pool.query(
-      `SELECT a.id, a.username
+      `SELECT a.id, a.username, a.role
        FROM admin_sessions s
        JOIN admin_accounts a ON a.id = s.admin_id
        WHERE s.token_hash = $1 AND s.expires_at > now() AND a.disabled_at IS NULL`,
@@ -23,4 +23,9 @@ export async function requireAdmin(request, _response, next) {
   } catch (error) {
     next(error);
   }
+}
+
+export function requireOwner(request, _response, next) {
+  if (request.admin?.role === 'owner') return next();
+  return next(new HttpError(403, 'ADMIN_OWNER_REQUIRED', '此操作需要專案最高管理權限'));
 }

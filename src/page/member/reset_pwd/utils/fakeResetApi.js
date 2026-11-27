@@ -6,26 +6,24 @@ const DELAY_MS = 600;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const INVALID_TOKEN = () => ({
+const INVALID_CODE = () => ({
   status: 400,
   body: {
     success: false,
-    error: { code: "INVALID_TOKEN", message: "重設連結無效或已過期" },
+    error: { code: "INVALID_OR_EXPIRED_CODE", message: "驗證碼無效、已過期或已達輸入次數上限" },
   },
 });
 
-// POST /api/auth/reset-password/verify（只檢查，不會用掉 token）
-export async function verifyResetToken(token) {
+// POST /api/auth/reset-password/verify（demo-only code: 004219）
+export async function verifyResetCode(email, code) {
   await wait(DELAY_MS);
-  if (token === "demo-valid" || token === "demo-expire-on-submit") {
-    return { status: 204, body: null };
-  }
-  return INVALID_TOKEN();
+  if (email === "demo@example.com" && code === "004219") return { status: 204, body: null };
+  return INVALID_CODE();
 }
 
 // POST /api/auth/reset-password
-export async function resetPassword(token) {
+export async function resetPassword(email, code) {
   await wait(DELAY_MS);
-  if (token === "demo-valid") return { status: 204, body: null };
-  return INVALID_TOKEN();
+  if (email === "demo@example.com" && code === "004219") return { status: 204, body: null };
+  return INVALID_CODE();
 }

@@ -4,42 +4,58 @@ import "./DevWorkbench.css";
 const FLOW_STEPS = [
   {
     number: "01",
-    title: "React 畫面",
-    description: "使用者互動、狀態與欄位驗證",
-    sourceIds: ["frontend-workbench", "frontend-api"],
-    firstSourceId: "frontend-workbench",
+    title: "前端畫面",
+    description: "會員、技能地圖與測驗前端介面",
+    sourceIds: ["frontend-register-page", "frontend-login-page", "frontend-workbench", "auth-flow-doc"],
+    firstSourceId: "frontend-register-page",
   },
   {
     number: "02",
     title: "前端 API adapter",
-    description: "共用 fetch、Session cookie 與 Idempotency-Key",
-    sourceIds: ["frontend-api", "frontend-quiz-api"],
-    firstSourceId: "frontend-quiz-api",
+    description: "會員 Session、共用請求與 C 測驗冪等鍵 adapter",
+    sourceIds: ["frontend-api", "frontend-auth-api", "frontend-quiz-api"],
+    firstSourceId: "frontend-auth-api",
   },
   {
     number: "03",
-    title: "Express 與驗證",
-    description: "同源檢查、登入 session、錯誤 envelope",
-    sourceIds: ["backend-app"],
+    title: "共用 Express",
+    description: "安全 headers、rate limit、身份與錯誤處理",
+    sourceIds: ["backend-app", "member-auth-routes", "member-session-service"],
     firstSourceId: "backend-app",
   },
   {
     number: "04",
-    title: "Route 與資料服務",
-    description: "驗證技能與題庫，再建立安全題目快照",
-    sourceIds: ["quiz-routes", "question-bank", "learning-history"],
-    firstSourceId: "quiz-routes",
+    title: "模組 routes 與 services",
+    description: "會員、管理、題庫、技能與歷史資料橋接",
+    sourceIds: ["email-code-service", "admin-routes", "question-bank", "learning-history", "xp-event-producer"],
+    firstSourceId: "question-bank",
   },
   {
     number: "05",
-    title: "PostgreSQL",
-    description: "Migration、交易、冪等鍵與學習歷史",
-    sourceIds: ["migration-010", "api-contract"],
-    firstSourceId: "migration-010",
+    title: "PostgreSQL 與契約",
+    description: "Schema migration、資料責任與操作文件",
+    sourceIds: ["migration-010", "migration-011", "migration-012", "api-contract", "integration-guide-index", "integration-guide-d"],
+    firstSourceId: "migration-012",
   },
 ];
 
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"];
+const API_GROUPS = [
+  { id: "all", label: "全部" },
+  { id: "member", label: "會員" },
+  { id: "learning", label: "目錄與歷史" },
+  { id: "quiz", label: "測驗（C PR #93 未合併）" },
+  { id: "admin", label: "管理後台" },
+];
+
+function belongsToApiGroup(operation, groupId) {
+  if (groupId === "all") return true;
+  if (groupId === "member") return operation.path.startsWith("/api/auth/") || operation.path.startsWith("/api/me");
+  if (groupId === "learning") return operation.path.startsWith("/api/skills") || operation.path.startsWith("/api/progress");
+  if (groupId === "quiz") return operation.path.startsWith("/api/quizzes/");
+  if (groupId === "admin") return operation.path.startsWith("/api/admin/");
+  return false;
+}
 
 async function getJson(path) {
   const response = await fetch(path, {
@@ -79,9 +95,10 @@ function statusLabel(result, readyLabel) {
 function DevWorkbench() {
   const [snapshot, setSnapshot] = useState({ loading: true, error: null });
   const [sourceList, setSourceList] = useState([]);
-  const [selectedSourceId, setSelectedSourceId] = useState("quiz-routes");
+  const [selectedSourceId, setSelectedSourceId] = useState("question-bank");
   const [source, setSource] = useState({ loading: true, error: null });
   const [refreshKey, setRefreshKey] = useState(0);
+  const [apiGroup, setApiGroup] = useState("quiz");
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +138,7 @@ function DevWorkbench() {
   }, [selectedSourceId]);
 
   const operations = useMemo(() => getOperations(snapshot.openApi), [snapshot.openApi]);
-  const quizOperations = operations.filter((operation) => operation.path.startsWith("/api/quizzes/"));
+  const selectedOperations = operations.filter((operation) => belongsToApiGroup(operation, apiGroup));
   const latestMigration = snapshot.status?.migrations?.at(-1);
 
   function chooseStep(step) {
@@ -210,13 +227,29 @@ function DevWorkbench() {
           <div className="workbench-panel-heading">
             <div>
               <p className="workbench-section-label">前後端 API 清單</p>
-              <h2>OpenAPI 中的測驗端點</h2>
+            <h2>依模組查看 API 端點</h2>
             </div>
-            <span className="workbench-count">{quizOperations.length} 支</span>
+            <span className="workbench-count">{selectedOperations.length} 支</span>
           </div>
-          {quizOperations.length ? (
+          <div className="workbench-api-filters" role="group" aria-label="選擇 API 模組">
+            {API_GROUPS.map((group) => {
+              const count = operations.filter((operation) => belongsToApiGroup(operation, group.id)).length;
+              return (
+                <button
+                  type="button"
+                  key={group.id}
+                  className={apiGroup === group.id ? "is-active" : ""}
+                  aria-pressed={apiGroup === group.id}
+                  onClick={() => setApiGroup(group.id)}
+                >
+                  {group.label}<span>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+          {selectedOperations.length ? (
             <ul className="workbench-endpoint-list">
-              {quizOperations.map((operation) => (
+              {selectedOperations.map((operation) => (
                 <li key={operation.operationId}>
                   <span className={`workbench-method method-${operation.method.toLowerCase()}`}>{operation.method}</span>
                   <code>{operation.path}</code>
@@ -226,7 +259,15 @@ function DevWorkbench() {
               ))}
             </ul>
           ) : (
-            <p className="workbench-empty">{snapshot.error ? "OpenAPI 尚未載入。" : "目前讀取中；請確認 OpenAPI 已載入。"}</p>
+            <p className="workbench-empty">
+              {snapshot.error
+                ? "OpenAPI 尚未載入。"
+                : !snapshot.openApi
+                  ? "目前讀取中；請確認 OpenAPI 已載入。"
+                  : apiGroup === "quiz"
+                    ? "目前 E app 只有會員測驗可用性與學習歷史 API；C 的建立與讀題 API 在 PR #93，尚未掛載。答案提交與結算也尚未完成，請先看 C 串接指南。"
+                    : "此模組目前沒有已掛載的 API 端點。"}
+            </p>
           )}
           <p className="workbench-note">工作台不會送出建立、修改或刪除請求。請到 API 文件檢查 Cookie 驗證和實際回應；寫入測試只連本機測試資料。</p>
         </div>

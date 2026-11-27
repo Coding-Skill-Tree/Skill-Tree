@@ -8,6 +8,7 @@ import AdminQuestionBankPage from "./AdminQuestionBankPage";
 import AdminQuestionDetailPage from "./AdminQuestionDetailPage";
 import AdminQuestionFormPage from "./AdminQuestionFormPage";
 import AdminPlaceholderPage from "./AdminPlaceholderPage";
+import AdminTeamPage from "./AdminTeamPage";
 import "./Admin.css";
 
 function AdminLoading() {
@@ -75,6 +76,12 @@ export default function AdminApp() {
   if (!admin) return <AdminLoginPage onLogin={handleLogin} />;
 
   const sharedProps = { admin, onLogout: handleLogout };
+  if (path === "/admin/team") {
+    if (admin.role !== "owner") {
+      return <main className="admin-auth-page"><section className="admin-auth-card"><h1>沒有組員管理權限</h1><p>只有專案最高管理者可以檢視或停用組員帳號。</p><a className="admin-primary-button" href="/admin">返回後台</a></section></main>;
+    }
+    return <AdminTeamPage {...sharedProps} />;
+  }
   if (path === "/admin" || path === "/admin/login") return <AdminDashboard {...sharedProps} />;
   if (path === "/admin/members") return <AdminMembersPage {...sharedProps} />;
   if (/^\/admin\/members\/[^/]+$/.test(path)) return <AdminMemberDetailPage {...sharedProps} />;
