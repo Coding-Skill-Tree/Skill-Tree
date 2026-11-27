@@ -23,6 +23,11 @@ const Home = () => {
         <NavLink to="/register" className="navList">
           Register
         </NavLink>
+        {import.meta.env.DEV && (
+          <NavLink to="/acceptance" className="navList">
+            驗收實驗室
+          </NavLink>
+        )}
       </nav>
     </div>
   );

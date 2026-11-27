@@ -28,7 +28,7 @@ export async function recordSkillCompletion(database, { userId, skillId, attempt
   const attempt = await database.query(
     `SELECT 1 FROM quiz_attempts
      WHERE id = $1 AND user_id = $2 AND skill_id = $3
-       AND status = 'completed' AND passed = true
+       AND status = 'completed' AND passed = true AND completed_at IS NOT NULL
      FOR SHARE`,
     [attemptId, userId, skillId],
   );

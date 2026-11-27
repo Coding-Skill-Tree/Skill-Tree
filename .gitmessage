@@ -1,0 +1,18 @@
+<type>: <繁體中文摘要>
+
+# type 使用英文 Conventional Commit 類型：
+# feat     新功能
+# fix      修正問題
+# refactor 重構
+# style    格式或樣式調整
+# docs     文件
+# test     測試
+# chore    維護工作
+# build    建置或依賴
+# ci       CI 設定
+# perf     效能改善
+# revert   還原提交
+#
+# 範例：
+# feat: 新增會員管理頁面
+# fix: 修正多選題答案判定錯誤

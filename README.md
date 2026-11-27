@@ -2,6 +2,10 @@
 
 Skill Tree 是遊戲化的前端工程學習工作區。前端以 React、JavaScript、Vite 開發；共用視覺 tokens 放在 `src/style/variables.css`。主線學習儀表板位於 `/`，E 管理後台位於 `/admin`。
 
+## Commit 訊息格式
+
+提交訊息統一使用「英文類型: 繁體中文摘要」，例如 `feat: 新增會員管理頁面`、`fix: 修正多選題答案判定錯誤`。英文類型採 Conventional Commits 慣例；本機提交範本位於 `.gitmessage`。
+
 ## 本機啟動
 
 需要 Node.js 24 和 PostgreSQL（共用 PostgreSQL major version 仍待團隊確認；目前開發基線以 PostgreSQL 17 為準）。前端與後端各有自己的 package lock，請分別安裝依賴。
@@ -36,7 +40,13 @@ Vite 將 `/api` 代理至 `http://127.0.0.1:3000`。前端和後端需同時執�
 
 新組員的逐步資料庫設定、API 測試和模組整合流程請看[後端與資料庫上手指南](docs/backend-onboarding.md)。
 
+GitHub 進度、本機未推送版本狀態，以及 A–E 組員的串接和驗收步驟請看[團隊後端整合與驗收手冊](docs/team-backend-integration-guide.md)。
+
+本機開發時可由導覽列開啟「驗收實驗室」，或直接前往 `/acceptance`。頁面逐步呼叫本機 API，顯示 HTTP 狀態、回應格式及驗收結果；資料庫整合測試紀錄和 B/C/D 尚待接入的項目也會分開標示。此頁只在 Vite 開發模式提供，不會打包進 production。完整後端測試請使用獨立 `TEST_DATABASE_URL` 後執行 `npm run test:api`。
+
 A–E 共用的正式路由、欄位名稱、回應格式、認證方式及資料責任請看[API 契約 v1](docs/api-contract.md)。各模組實作 API 前先依這份契約對齊。
+
+本機互動式 API 文件與測試工作台：先啟動前端及 API，再開啟 [`/api/docs`](http://localhost:5173/api/docs)；OpenAPI JSON 位於 [`/api/openapi.json`](http://localhost:5173/api/openapi.json)。登入後可在同一瀏覽器測試會員／管理員 session API。操作前請確認連到本機開發資料庫；寫入題目或停權會員會修改資料。
 
 共用資料表、關聯、索引、migration 清單和資料責任請看[PostgreSQL Schema 概覽](docs/database-schema.md)。
 

@@ -10,6 +10,7 @@ import { hashPassword } from '../src/lib/password.js';
 import { hashRateLimitSubject } from '../src/services/auth-rate-limit.js';
 import { listPublishedQuestionsForSkill, getPublishedQuestionCoverage } from '../src/services/question-bank.js';
 import { recordSkillCompletion } from '../src/services/progress-service.js';
+import { enqueueSkillFirstPassXpEvent } from '../src/services/xp-outbox.js';
 
 const tag = randomUUID().replaceAll('-', '').slice(0, 16);
 const password = 'SkillTree9';
@@ -131,6 +132,8 @@ after(async () => {
   }
 
   try {
+    await pool.query('DELETE FROM xp_ledger WHERE user_id = ANY($1::bigint[])', [fixtures.userIds]);
+    await pool.query('DELETE FROM xp_outbox WHERE user_id = ANY($1::bigint[])', [fixtures.userIds]);
     await pool.query('DELETE FROM user_skill_completions WHERE user_id = ANY($1::bigint[]) OR skill_id = $2', [fixtures.userIds, fixtures.skillId]);
     await pool.query('DELETE FROM quiz_attempts WHERE user_id = ANY($1::bigint[]) OR skill_id = $2', [fixtures.userIds, fixtures.skillId]);
     await pool.query('DELETE FROM questions WHERE skill_id = $1', [fixtures.skillId]);
@@ -149,6 +152,14 @@ after(async () => {
 
 test('Skill Tree API integration contract', async (t) => {
   await t.test('health and CORS permit the implemented PUT route', async () => {
+    const openApi = await api('/api/openapi.json');
+    assert.equal(openApi.status, 200);
+    const spec = await openApi.json();
+    assert.ok(spec.paths['/api/progress/history']);
+    const explorer = await api('/api/docs/');
+    assert.equal(explorer.status, 200);
+    assert.match(await explorer.text(), /Skill Tree API Explorer/u);
+
     const health = await api('/api/health');
     assert.equal(health.status, 200);
     assert.deepEqual(await health.json(), {
@@ -340,18 +351,34 @@ test('Skill Tree API integration contract', async (t) => {
     assert.equal(initialData.revision, '0');
     assert.deepEqual(initialData.completedSkillIds, []);
 
-    const attemptId = randomUUID();
+    const attemptIds = [randomUUID(), randomUUID(), randomUUID()];
+    const historyTimestamp = '2026-11-25T10:30:00.123456Z';
+    const skillTitle = `Integration ${tag}`;
+    for (const attemptId of attemptIds) {
+      await pool.query(
+        `INSERT INTO quiz_attempts(id, user_id, skill_id, skill_title_snapshot, catalog_version, status, total_questions,
+                                   correct_count, passed, completed_at)
+         VALUES ($1, $2, $3, $4, 7, 'completed', 5, 5, true, $5::timestamptz)`,
+        [attemptId, member.id, fixtures.skillId, skillTitle, historyTimestamp],
+      );
+    }
+    const attemptId = attemptIds[0];
+    const otherAttemptId = randomUUID();
     await pool.query(
-      `INSERT INTO quiz_attempts(id, user_id, skill_id, catalog_version, status, total_questions,
+      `INSERT INTO quiz_attempts(id, user_id, skill_id, skill_title_snapshot, catalog_version, status, total_questions,
                                  correct_count, passed, completed_at)
-       VALUES ($1, $2, $3, 7, 'completed', 5, 5, true, now())`,
-      [attemptId, member.id, fixtures.skillId],
+       VALUES ($1, $2, $3, $4, 7, 'completed', 5, 4, true, $5::timestamptz)`,
+      [otherAttemptId, otherMember.id, fixtures.skillId, skillTitle, historyTimestamp],
     );
     let client = await pool.connect();
     let first;
+    let firstXpEvent;
+    let repeatedXpEvent;
     try {
       await client.query('BEGIN');
       first = await recordSkillCompletion(client, { userId: member.id, skillId: fixtures.skillId, attemptId });
+      firstXpEvent = await enqueueSkillFirstPassXpEvent(client, { userId: member.id, skillId: fixtures.skillId, attemptId });
+      repeatedXpEvent = await enqueueSkillFirstPassXpEvent(client, { userId: member.id, skillId: fixtures.skillId, attemptId });
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -361,6 +388,22 @@ test('Skill Tree API integration contract', async (t) => {
     }
     assert.equal(first.newlyCompleted, true);
     assert.equal(first.revision, '1');
+    assert.equal(firstXpEvent.created, true);
+    assert.equal(repeatedXpEvent.created, false);
+    assert.equal(repeatedXpEvent.eventId, firstXpEvent.eventId);
+    const outbox = await pool.query(
+      `SELECT user_id::text AS "userId", amount, payload
+       FROM xp_outbox WHERE event_id = $1`,
+      [firstXpEvent.eventId],
+    );
+    assert.equal(outbox.rows[0].userId, member.id);
+    assert.equal(outbox.rows[0].amount, null);
+    assert.deepEqual(outbox.rows[0].payload, {
+      skillId: fixtures.skillId,
+      attemptId,
+      catalogVersion: 7,
+      completedAt: new Date(historyTimestamp).toISOString(),
+    });
 
     client = await pool.connect();
     let duplicate;
@@ -376,6 +419,8 @@ test('Skill Tree API integration contract', async (t) => {
     }
     assert.equal(duplicate.newlyCompleted, false);
     assert.equal(duplicate.revision, '1');
+    const eventCount = await pool.query('SELECT count(*)::int AS count FROM xp_outbox WHERE user_id = $1', [member.id]);
+    assert.equal(eventCount.rows[0].count, 1);
 
     const afterCompletion = await api('/api/progress', { cookie: memberCookie });
     const afterData = (await afterCompletion.json()).data;
@@ -386,6 +431,35 @@ test('Skill Tree API integration contract', async (t) => {
       recordSkillCompletion(pool, { userId: member.id, skillId: fixtures.skillId, attemptId: randomUUID() }),
       (error) => error.code === 'SKILL_COMPLETION_REQUIRES_PASSED_ATTEMPT',
     );
+
+    const unauthenticatedHistory = await api('/api/progress/history');
+    assert.equal(unauthenticatedHistory.status, 401);
+    const firstPage = await api('/api/progress/history?limit=2', { cookie: memberCookie });
+    assert.equal(firstPage.status, 200);
+    const firstPageData = (await firstPage.json()).data;
+    const expectedIds = [...attemptIds].sort().reverse();
+    assert.deepEqual(firstPageData.items.map((item) => item.activityId), expectedIds.slice(0, 2));
+    assert.ok(firstPageData.items.every((item) => item.skillId === fixtures.skillId));
+    assert.ok(firstPageData.items.every((item) => item.skillTitle.startsWith('Integration ')));
+    assert.ok(firstPageData.nextCursor);
+
+    const secondPage = await api(`/api/progress/history?limit=2&cursor=${encodeURIComponent(firstPageData.nextCursor)}`, { cookie: memberCookie });
+    assert.equal(secondPage.status, 200);
+    const secondPageData = (await secondPage.json()).data;
+    assert.deepEqual(secondPageData.items.map((item) => item.activityId), expectedIds.slice(2));
+    assert.equal(secondPageData.nextCursor, null);
+    assert.ok(![...firstPageData.items, ...secondPageData.items].some((item) => item.activityId === otherAttemptId));
+
+    const invalidLimit = await api('/api/progress/history?limit=0', { cookie: memberCookie });
+    assert.equal(invalidLimit.status, 400);
+    assert.equal((await invalidLimit.json()).error.code, 'VALIDATION_ERROR');
+    const invalidTimestampCursor = Buffer.from(JSON.stringify({
+      completedAt: '2026-02-31T10:30:00.000000Z',
+      activityId: attemptIds[0],
+    }), 'utf8').toString('base64url');
+    const invalidCursor = await api(`/api/progress/history?cursor=${invalidTimestampCursor}`, { cookie: memberCookie });
+    assert.equal(invalidCursor.status, 400);
+    assert.equal((await invalidCursor.json()).error.code, 'VALIDATION_ERROR');
   });
 
   await t.test('C question repository filters demo, draft, deleted and inactive rows; coverage uses five approved questions', async () => {
