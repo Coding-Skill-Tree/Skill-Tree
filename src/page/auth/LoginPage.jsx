@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import AuthLayout from './components/AuthLayout';
+import AuthLink from './components/AuthLink';
 import './LoginPage.css';
 
-export default function LoginPage() {
+export default function LoginPage({ loginPath = '/login', registerPath = '/register', LinkComponent } = {}) {
   const [showPassword, setShowPassword] = useState(false);
   function handleSubmit(event) { event.preventDefault(); }
   return (
-    <main className="st-login__main">
+    <AuthLayout page="login" loginPath={loginPath} registerPath={registerPath} LinkComponent={LinkComponent}>
+      <main className="st-login__main">
         <form className="st-login__form" onSubmit={handleSubmit} aria-labelledby="login-title">
           <fieldset className="st-login__panel">
             <legend className="st-login__title" id="login-title">登入</legend>
@@ -31,10 +34,11 @@ export default function LoginPage() {
             <button className="st-login__button st-login__submit" type="submit">登入</button>
             <div className="st-login__links">
               <a href="#" onClick={(event) => event.preventDefault()}>忘記密碼？</a>
-              <a href="#/register">還沒有帳號？註冊</a>
+              <AuthLink to={registerPath} LinkComponent={LinkComponent}>還沒有帳號？註冊</AuthLink>
             </div>
           </fieldset>
         </form>
       </main>
+    </AuthLayout>
   );
 }
