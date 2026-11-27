@@ -1,26 +1,59 @@
 import avatarIcon from "../../assets/avatar-icon.png";
+import "./PageHeader.css";
 
 export default function PageHeader({
   title = "選擇前端學習技能",
-  description = "挑選一個你想精進的前端技能，展開專屬的學習地圖。",
-  eyebrow = "CHOOSE YOUR SKILL",
+  description = "",
+  eyebrow = "",
+  onOpenMobileNav,
+  mobileNavToggleRef,
+  onNotificationClick,
+  onAvatarClick,
 }) {
   return (
-    <header className="page-header">
-      {/* 左側：頁面標題 */}
-      <div className="page-heading">
-        <p>{eyebrow}</p>
+    <header className="st-page-header">
+      {/* 左側：標題 */}
+      <div className="st-page-heading">
+        {eyebrow && <p className="st-page-eyebrow">{eyebrow}</p>}
+
         <h1>{title}</h1>
-        <p>{description}</p>
+
+        {description && <p className="st-page-description">{description}</p>}
       </div>
 
-      {/* 右側：通知與頭像 */}
-      <div className="header-actions">
-        <button type="button" className="notification-button" aria-label="通知">
+      {/* 右側：選單、通知、頭像 */}
+      <div className="st-header-actions">
+        {onOpenMobileNav && (
+          <button
+            type="button"
+            ref={mobileNavToggleRef}
+            className="st-mobile-nav-toggle"
+            onClick={onOpenMobileNav}
+            aria-label="開啟導覽選單"
+            aria-controls="dashboard-mobile-nav"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
+
+        {/* 通知鈴鐺 */}
+        <button
+          type="button"
+          className="st-notification-button"
+          aria-label="通知"
+          onClick={onNotificationClick}
+          disabled={!onNotificationClick}
+        >
           <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -33,11 +66,18 @@ export default function PageHeader({
             <path d="M10 21h4" />
           </svg>
 
-          <span className="notification-dot" />
+          <span className="st-notification-dot" aria-hidden="true" />
         </button>
 
-        <button type="button" className="avatar-button" aria-label="使用者頭像">
-          <img src={avatarIcon} alt="" className="avatar-image" />
+        {/* 圓形頭像 */}
+        <button
+          type="button"
+          className="st-avatar-button"
+          aria-label="使用者頭像"
+          onClick={onAvatarClick}
+          disabled={!onAvatarClick}
+        >
+          <img src={avatarIcon} alt="" className="st-avatar-image" />
         </button>
       </div>
     </header>
