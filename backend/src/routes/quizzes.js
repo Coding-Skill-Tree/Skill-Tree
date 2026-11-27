@@ -9,6 +9,9 @@ import { randomUUID, createHash } from "node:crypto";
 
 export const quizzesRouter = Router();
 
+// ===========================================================================
+// API 01 建立測驗
+
 quizzesRouter.post(
   "/quizzes/attempts",
   requireMember,
@@ -288,7 +291,7 @@ quizzesRouter.post(
 );
 
 // ===========================================================================
-
+// API 02 取得題目
 quizzesRouter.get(
   "/quizzes/attempts/:attemptId",
   requireMember,
@@ -308,6 +311,7 @@ quizzesRouter.get(
           attemptId: "attemptId 格式不正確",
         });
       }
+
       client = await pool.connect();
       await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       transactionStarted = true;
@@ -405,6 +409,261 @@ quizzesRouter.get(
         answeredCount: answeredCount,
         questions: questions,
       });
+    } catch (error) {
+      if (client && transactionStarted) {
+        try {
+          await client.query("ROLLBACK");
+          transactionStarted = false;
+        } catch (rollbackError) {
+          console.error("Quiz transaction rollback failed:", rollbackError);
+          discardClient = true;
+        }
+      } else if (client) {
+        discardClient = true;
+      }
+      next(error);
+    } finally {
+      client?.release(discardClient);
+    }
+  },
+);
+
+// ===========================================================================
+// API 03 提交單題答案
+
+quizzesRouter.post(
+  "/quizzes/attempts/:attemptId/answers",
+  requireMember,
+
+  async (request, response, next) => {
+    let client;
+    let transactionStarted = false;
+    let discardClient = false;
+    try {
+      const attemptId = request.params.attemptId;
+      const body = request.body ?? {};
+      const ordinal = body.ordinal;
+      const selectedChoices = body.selectedChoices;
+      const userId = request.member.id;
+
+      const uuidPattern =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (
+        typeof attemptId !== "string" ||
+        attemptId.length !== 36 ||
+        !uuidPattern.test(attemptId)
+      ) {
+        throw validationError({
+          attemptId: "測驗 Id 格式不正確",
+        });
+      }
+      if (!Number.isInteger(ordinal) || ordinal < 1 || ordinal > 5) {
+        throw validationError({
+          ordinal: "題號必須為 1 至 5 的整數",
+        });
+      }
+      if (
+        !Array.isArray(selectedChoices) ||
+        selectedChoices.length !== 1 ||
+        !Number.isInteger(selectedChoices[0]) ||
+        selectedChoices[0] < 0 ||
+        selectedChoices[0] > 2
+      ) {
+        throw validationError({
+          selectedChoices: "必須提供一個介於0至2的選項索引",
+        });
+      }
+
+      client = await pool.connect();
+      await client.query("BEGIN ISOLATION LEVEL READ COMMITTED");
+      transactionStarted = true;
+
+      const memberLockResult = await client.query(
+        `SELECT id
+        FROM users
+        WHERE id = $1
+        AND suspended_at IS NULL
+        FOR UPDATE`,
+        [userId],
+      );
+
+      if (!memberLockResult.rows[0]) {
+        throw new HttpError(401, "UNAUTHENTICATED", "尚未登入");
+      }
+
+      const attemptResult = await client.query(
+        `SELECT id AS "attemptId",
+        skill_id AS "skillId",
+        status,
+        total_questions AS "totalCount"
+        FROM quiz_attempts
+        WHERE id = $1
+        AND user_id = $2
+        FOR UPDATE`,
+        [attemptId, userId],
+      );
+      const attempt = attemptResult.rows[0];
+      if (!attempt || attempt.status === "cancelled") {
+        throw new HttpError(404, "ATTEMPT_NOT_FOUND", "找不到測驗");
+      }
+
+      const questionResult = await client.query(
+        `SELECT ordinal AS "ordinal",
+        choices_snapshot AS "choices",
+        answer_mode_snapshot AS "answerMode",
+        correct_choices_snapshot AS "correctChoices",
+        selected_choices AS "selectedChoices",
+        answered_at AS "answeredAt"
+        FROM quiz_attempt_questions
+        WHERE attempt_id = $1
+        ORDER BY ordinal ASC
+        FOR UPDATE`,
+        [attemptId],
+      );
+      const questions = questionResult.rows;
+      if (
+        attempt.totalCount !== 5 ||
+        questions.length !== attempt.totalCount ||
+        !questions.every((question, index) => question.ordinal === index + 1)
+      ) {
+        throw new Error("Invalid quiz question snapshots");
+      }
+
+      const question = questions.find((item) => item.ordinal === ordinal);
+      if (!question) {
+        throw new Error("Quiz question snapshot not found");
+      }
+
+      if (
+        question.answerMode !== "single" ||
+        !Array.isArray(question.choices) ||
+        question.choices.length !== 3 ||
+        !Array.isArray(question.correctChoices) ||
+        question.correctChoices.length !== 1 ||
+        !Number.isInteger(question.correctChoices[0]) ||
+        question.correctChoices[0] < 0 ||
+        question.correctChoices[0] > 2
+      ) {
+        throw new Error("Invalid quiz question snapshot format");
+      }
+
+      const validAnswerStates = questions.every((item) => {
+        if (!Array.isArray(item.selectedChoices)) {
+          return false;
+        }
+        if (item.answeredAt === null) {
+          return item.selectedChoices.length === 0;
+        }
+
+        return (
+          item.answeredAt !== undefined &&
+          item.selectedChoices.length === 1 &&
+          Number.isInteger(item.selectedChoices[0]) &&
+          item.selectedChoices[0] >= 0 &&
+          item.selectedChoices[0] <= 2
+        );
+      });
+      if (!validAnswerStates) {
+        throw new Error("Invalid quiz answer states");
+      }
+
+      const answeredCount = questions.filter(
+        (item) => item.answeredAt !== null,
+      ).length;
+
+      const validAnswerOrder = questions.every((item) => {
+        const isAnswered = item.answeredAt !== null;
+        const shouldBeAnswered = item.ordinal <= answeredCount;
+
+        return isAnswered === shouldBeAnswered;
+      });
+      if (!validAnswerOrder) {
+        throw new Error("Invalid quiz answer order");
+      }
+
+      if (question.answeredAt !== null) {
+        const sameAnswer = question.selectedChoices[0] === selectedChoices[0];
+        if (!sameAnswer) {
+          throw new HttpError(
+            409,
+            "ANSWER_ALREADY_SUBMITTED",
+            "此題已提交答案，不可修改",
+          );
+        }
+        const isCorrect =
+          question.selectedChoices[0] === question.correctChoices[0];
+
+        await client.query("COMMIT");
+        transactionStarted = false;
+        return sendSuccess(
+          response,
+          {
+            attemptId: attempt.attemptId,
+            ordinal: question.ordinal,
+            answer: { selectedChoices: question.selectedChoices, isCorrect },
+            answeredCount,
+            totalCount: attempt.totalCount,
+            status: attempt.status,
+          },
+          200,
+        );
+      }
+      if (attempt.status === "completed") {
+        throw new HttpError(409, "ATTEMPT_ALREADY_COMPLETED", "測驗已完成");
+      }
+      const nextOrdinal = answeredCount + 1;
+      if (nextOrdinal !== ordinal) {
+        throw new HttpError(
+          409,
+          "INVALID_QUESTION_ORDER",
+          "請依照題目順序作答",
+        );
+      }
+      if (ordinal === attempt.totalCount) {
+        throw new HttpError(
+          501,
+          "QUIZ_SETTLEMENT_NOT_IMPLEMENTED",
+          "測驗結算功能尚未完成",
+        );
+      }
+
+      const isCorrect = selectedChoices[0] === question.correctChoices[0];
+
+      const updateResult = await client.query(
+        `UPDATE quiz_attempt_questions
+          SET selected_choice = $3,
+          selected_choices = $4::jsonb,
+          answered_at = NOW()
+          WHERE attempt_id = $1
+          AND ordinal = $2
+          AND answered_at IS NULL
+          RETURNING ordinal,
+          selected_choices AS "selectedChoices",
+          answered_at AS "answeredAt"`,
+        [
+          attemptId,
+          ordinal,
+          selectedChoices[0],
+          JSON.stringify(selectedChoices),
+        ],
+      );
+      if (updateResult.rowCount !== 1) {
+        throw new Error("Failed to save quiz answer");
+      }
+      const updatedQuestion = updateResult.rows[0];
+      const nextAnsweredCount = answeredCount + 1;
+      const responseData = {
+        attemptId: attempt.attemptId,
+        ordinal: updatedQuestion.ordinal,
+        answer: { selectedChoices: updatedQuestion.selectedChoices, isCorrect },
+        answeredCount: nextAnsweredCount,
+        totalCount: attempt.totalCount,
+        status: attempt.status,
+      };
+      await client.query("COMMIT");
+      transactionStarted = false;
+      return sendSuccess(response, responseData, 200);
     } catch (error) {
       if (client && transactionStarted) {
         try {
