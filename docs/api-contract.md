@@ -255,7 +255,7 @@ P2-D-05 要求的 `GET /api/progress/achievements` 和 P2-D-06 指定的 `GET /a
 | P2-E-04 技能目錄與進度 | `skillId` 為 B×C 已確認的標準 ID；skills/progress 共用目錄版本計算；內部 completion service 驗證通過測驗、冪等寫入並只在首次完成增加 revision。 | 使用 PostgreSQL 驗證目錄與進度一致、首次／重複完成及無效 attempt；正式技能資料由 B 提供。 |
 | P2-E-05 題庫資料與維護 | 管理員 CRUD 保持受管理員 session 保護；E backend-only service 可查正式題目與正解，並提供不含題目／答案的會員可用性 API；新增題目索引 DB constraints 和每技能題庫覆蓋檢查。C PR #93 尚未改用 E service，也未掛入本 app。 | 測試驗證正解不經公開 HTTP 端點提供、展示／草稿／刪除題被排除及每個正式技能至少 5 題。正式內容由 B/C 提供；C/E 接線和共用 app DB 整合仍待驗收。 |
 | P2-E-06 回應格式與驗證 | Success/error envelope、`error.fields`、request ID、狀態碼與前端 API client 統一；補上 `PUT` preflight。 | 測試驗證欄位錯誤、無效 JSON、CORS、認證錯誤與資料庫錯誤均遵守契約。 |
-| P2-E-07 跨模組整合與 API 測試 | 新增獨立 test database runner、migration rerun、API/session/profile/progress/question bank/admin integration tests；B/C/D 契約先以 API shape 和服務介面暫驗。本次 review 通過 build 和 18 個不需資料庫的測試；未設定 `TEST_DATABASE_URL`，沒有執行 migration 或 DB 整合測試。 | 只有接上 B/C/D 真實服務並取得組員驗收後才算完整 E07；目前測試替身不等同端對端完成。 |
+| P2-E-07 跨模組整合與 API 測試 | 已建立獨立 test database runner；在隔離 PostgreSQL `skill_tree_test` 執行 `npm run test:api`，migrations 001–012 乾淨套用並成功重跑，33 項 API／session／profile／progress／question bank／admin 整合測試全數通過。 | E 自有 API 與資料庫整合已驗收；B/C/D 真實服務尚未全部接入同一 app，因此端對端串接和組員驗收仍待完成。 |
 
 ## 後續功能想法收件清單
 
