@@ -4,7 +4,7 @@ E 提供技能目錄和會員進度的資料來源；B 負責節點呈現、解�
 
 ## 目前遠端頁面狀態
 
-截至 2026-11-28，PR #90 已合併；此 E integration candidate 的 root `src/App.jsx` 將 `/skillmap` 指向 `src/page/skill-map/SkillMapPage.jsx`。新版頁面仍使用本機示範進度和內建 `data/skills.js`，尚未改接 E 的 `GET /api/skills`、會員進度與 `quiz-availability` API；B PR #84 仍開啟，實際整合前請對照最新分支。
+截至 2026-11-28，PR #90 已合併；E Draft PR #94 的 root `src/App.jsx` 將 `/skillmap` 指向 `src/page/skill-map/SkillMapPage.jsx`。新版頁面仍使用本機示範進度和內建 `data/skills.js`，尚未改接 E 的 `GET /api/skills`、會員進度與 `quiz-availability` API；B PR #84 仍開啟，實際整合前請對照最新分支。
 
 E 的正式 API 在 E 整合候選分支，並非目前遠端 `main` 已經可用的服務。要測 E API，A–E 組員必須先切到同一個 E PR head SHA，並在自己的本機 DB 套用該分支 migrations。
 

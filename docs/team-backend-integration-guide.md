@@ -1,10 +1,10 @@
 # Skill Tree 團隊後端整合與驗收手冊
 
-> **文件狀態：**依 2026-11-28 的遠端 GitHub、Discord 小組聊天室、專案通知郵件與本機 E integration candidate 核對。私人信箱和聊天室只作為發布進度來源；本文件沒有代任何組員發訊息。
+> **文件狀態：**依 2026-11-28 的遠端 GitHub、Discord 小組聊天室、專案通知郵件與 E integration PR #94 核對。私人信箱和聊天室只作為發布進度來源；本文件沒有代任何組員發訊息。
 >
-> **版本核對：**遠端 `main` 最新 SHA 為 `c814544`（PR #92 merge commit）。目前 E integration candidate 已從該 SHA 重播，保留 PR #90 SkillMap、PR #91 會員 UI、PR #92 dashboard／mock XP 變更；本文件所列 E 變更尚未推送或建立 PR。GitHub Connector 可讀取遠端狀態；本機 shell 的 DNS 目前無法連 `github.com`。
+> **版本核對：**遠端 `main` 最新 SHA 為 `c814544`（PR #92 merge commit）。E integration 已推送至 [Draft PR #94](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/94)，目前 head 為 `3120f31`；分支保留 PR #90 SkillMap、PR #91 會員 UI、PR #92 dashboard／mock XP 變更。C 的 [PR #93](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/93) 仍未合併。本文件與 E 端程式碼都屬於 PR #94。
 >
-> **適用對象：**A、B、C、D、E 組員，以及第一次使用本專案的組員。
+> **適用對象：**本專案五位組員 A、B、C、D、E；E 負責此 PR，跨模組協作者為 A–D。
 > **使用順序：**先看「版本與完成狀態」，再依「快速開始」啟動服務，最後按模組流程串接和驗收。
 
 ## 1. 先確認大家拿到的是同一個版本
@@ -13,9 +13,9 @@
 
 截至 2026-11-28，團隊 repo [Coding-Skill-Tree/Skill-Tree](https://github.com/Coding-Skill-Tree/Skill-Tree) 的 `main` 為 `c814544`；PR #90（B SkillMap）、#91（A 會員 UI）和 #92（Dashboard／XP mock data）已合併。[C 測驗 API PR #93](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/93) 仍 open，尚未合併；GitHub 目前顯示它不是 Draft，雖然 PR 文字寫著暫時以 Draft 提交。[B PR #84](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/84) 仍開啟；C 舊 PR #86 和 E 舊 PR #88 已關閉但未合併。
 
-此 E candidate 從目前 `main` 重播後，`/skillmap` 保留 `src/page/skill-map/SkillMapPage.jsx`；沒有把 C 的 `quizzes.js` 複製進 E app。C PR #93 的建立／讀題 routes、靜態教材 gate 及 C 專屬 helper 仍由 C PR 管理。E candidate 提供 migration 010、`Idempotency-Key` CORS、題庫／可用性共用服務、完成／XP outbox services 和歷史 projection；接上 C route 前仍須做同 app、同測試 DB 的整合回歸。
+此 E PR #94 從目前 `main` 整合後，`/skillmap` 保留 `src/page/skill-map/SkillMapPage.jsx`；沒有把 C 的 `quizzes.js` 複製進 E app。C PR #93 的建立／讀題 routes、靜態教材 gate 及 C 專屬 helper 仍由 C PR 管理。E PR #94 提供 migration 010、`Idempotency-Key` CORS、題庫／可用性共用服務、完成／XP outbox services 和歷史 projection；接上 C route 前仍須做同 app、同測試 DB 的整合回歸。
 
-本 candidate 還包括：
+本 PR 還包括：
 
 - migrations 009–012：題目索引完整性、測驗歷史與冪等、admin owner/editor、密碼重設碼。
 - `GET /api/skills/{skillId}/quiz-availability` 與 `GET /api/progress/history`。
@@ -32,9 +32,9 @@
 
 因此：
 
-1. 從 GitHub `main` clone 的組員會拿到 PR #90–#92 的已合併內容，但不會拿到 E candidate 或未合併的 C PR #93。
-2. 一起驗收 E 服務前，請先確認所有人使用相同 E PR head SHA，並各自連自己的本機測試資料庫。PR #93 與 E candidate 合併後才可做 C 的共用 app 驗收。
-3. Ready 前由 A review 註冊／密碼重設畫面，B 核對 skill availability 與正式目錄，C 核對測驗 API／冪等和 migration 契約，D 核對 XP event／歷史橋接。三位正式 reviewer 仍需 PR owner 指派。
+1. 從 GitHub `main` clone 的組員會拿到 PR #90–#92 的已合併內容，但不會拿到尚未合併的 E PR #94 或 C PR #93。
+2. 一起驗收 E 服務前，請先確認所有人使用相同 PR #94 head SHA，並各自連自己的本機測試資料庫。C PR #93 與 E PR #94 的 routes、migration 和共用服務整合到同一測試分支後，才可做 C 的共用 app 驗收。
+3. 團隊共五人（A–E），E 是 PR #94 作者；若要求三人 review，應由 A–D 中至少三位擔任 reviewer。PR #94 目前尚未指派 reviewer。
 
 ### 1.2 共同工作狀態表
 
@@ -46,7 +46,7 @@
 | B | PR #84 仍開啟；PR #90 已合併 SkillMap page architecture。 | `GET /api/skills`、`GET /api/progress`、`GET /api/progress/history`、`GET /api/skills/{skillId}/quiz-availability`；另有獨立 B 串接指南。 | 提供正式 `skillId` 目錄、ready 條件並驗收畫面；availability GET 只供顯示，測驗 POST 必須重驗。 |
 | C | C PR #93 提供建立／讀題 routes，仍未合併；PR #86 已關閉未合併。 | E 提供題庫／availability services、CORS、`recordSkillCompletion()`、首次 XP event enqueue、history API 和 migration 010；C-owned routes 尚未掛到 E app。 | 把 C route 對齊 E migration 和題庫 availability service；完成答案提交／結算，再做同一 app 與隔離 DB 的回歸。 |
 | D | 儀表板切版 PR #39 已合併；P2-D-01～07 仍開啟。 | 本機 migration 有 `xp_outbox`、`xp_ledger` 及 lease 欄位；本機有首通 XP event enqueue 服務。 | 尚無 D 的 XP 消費 worker／發獎規則完整實作。D 需定義 claim、lease 確認／失敗、重試、入帳與等級規則，再和 C 做真實流程驗收。 |
-| E | 管理後台 PR #40、題庫多選 PR #80 已合併；P2-E-01～07 仍開啟。 | 本 PR 候選包含 Express、PostgreSQL migrations、登入 session、owner/editor 管理、唯讀 `/demo`、安全 middleware、題庫與會員管理 API、共用回應格式、API Explorer、開發工作台和學習歷史橋接。 | 使用獨立測試 DB；完成 PostgreSQL major version 決策、正式 B 題庫資料及 A/B/C/D 真實串接驗收後，才更新 issue 完成狀態。安全部署與共用資料庫尚未在線上環境驗收。 |
+| E | 管理後台 PR #40、題庫多選 PR #80 已合併；P2-E-01～07 仍開啟。 | Draft PR #94 包含 Express、PostgreSQL migrations、登入 session、owner/editor 管理、唯讀 `/demo`、安全 middleware、題庫與會員管理 API、共用回應格式、API Explorer、開發工作台和學習歷史橋接。 | 使用獨立測試 DB；完成 PostgreSQL major version 決策、正式 B 題庫資料及 A/B/C/D 真實串接驗收後，才更新 issue 完成狀態。安全部署與共用資料庫尚未在線上環境驗收。 |
 
 ### 1.3 這是每個人自己的本機服務
 
