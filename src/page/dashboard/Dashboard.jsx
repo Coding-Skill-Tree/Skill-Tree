@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import DashboardHeader from "./components/DashboardHeader/DashboardHeader.jsx";
-// import DashboardSidebar from "./components/DashboardSidebar/DashboardSidebar.jsx";
 import Sidebar from "../shared-components/Sidebar.jsx";
 import ProfileInfo from "./components/ProfileInfo/ProfileInfo.jsx";
 import XpOverview from "./components/XpOverview/XpOverview.jsx";
