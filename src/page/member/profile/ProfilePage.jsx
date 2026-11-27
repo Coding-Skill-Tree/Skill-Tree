@@ -4,6 +4,9 @@ import { getMe, logout } from "./utils/fakeSessionApi.js";
 import SiteHeader from "./components/SiteHeader/SiteHeader.jsx";
 import PageStatus from "./components/PageStatus/PageStatus.jsx";
 import BasicInfo from "./components/BasicInfo/BasicInfo.jsx";
+import Sidebar from "../../shared-components/sidebar/Sidebar.jsx";
+import { AVATARS } from "../onboarding/data/characterOptions.js";
+import "../../shared-components/sidebar/style.css";
 // 示範區塊與浮動通知和忘記密碼頁共用
 import DemoHint from "../forget_pwd/components/DemoHint/DemoHint.jsx";
 import FloatingNotice from "../forget_pwd/components/FloatingNotice/FloatingNotice.jsx";
@@ -70,8 +73,15 @@ function ProfilePage() {
     <div className="profile-page">
       <FloatingNotice notice={notice} onDone={clearNotice} />
       <SiteHeader />
+      <div className="profile-body">
+        <Sidebar
+          stats={{ level: 1, xp: 0 }}
+          activePage="user"
+          nickname={user?.username || "前端學習者"}
+          avatar={AVATARS.find((a) => a.id === user?.avatarId) ?? null}
+        />
 
-      <main className="profile-main">
+        <main className="profile-main">
         <div className="profile-card">
           <h1 className="profile-title">{PROFILE_TEXT.title}</h1>
 
@@ -108,7 +118,8 @@ function ProfilePage() {
           </p>
           <p>編輯時把暱稱改成 {DEMO_TAKEN_NICKNAMES.join("、")}，儲存會顯示「此暱稱已被使用」。</p>
         </DemoHint>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

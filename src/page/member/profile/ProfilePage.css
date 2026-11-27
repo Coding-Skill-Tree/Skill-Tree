@@ -13,6 +13,29 @@
   flex-direction: column;
 }
 
+/* sidebar 與內容並排；寬度沿用 sidebar 的 --sidebar-width */
+.profile-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--sidebar-width, 224px) minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 601px) {
+  /* 桌面版 sidebar 固定在頁首下方，高度扣掉頁首的 61px，避免多出捲動 */
+  .profile-body > .sidebar {
+    top: 61px;
+    height: calc(100dvh - 61px);
+  }
+}
+
+@media (max-width: 600px) {
+  /* 手機版 sidebar 是頂部橫列，改成單欄 */
+  .profile-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .profile-main {
   flex: 1;
   display: flex;
