@@ -1,0 +1,55 @@
+/* Login page styles. Shared layout: components/AuthLayout.css. */
+.st-login__main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px 1em; font: 400 clamp(12px, 1.3483vw, 16px)/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif; }
+.st-login__form { width: 100%; max-width: 25.6667em; margin: 0; }
+.st-login__panel {
+  min-width: 0; margin: 0;
+  padding: .8333em .9167em 1em;
+  border: 1px solid #28382d; border-radius: .75em;
+  background: var(--panel-bg); box-shadow: 0 2em 4em rgba(0,0,0,.09);
+}
+.st-login__title {
+  margin-left: 0; padding: 0 .35em;
+  background: transparent; color: var(--accent);
+  font-size: 1em; font-weight: 600;
+}
+.st-login__button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 2.5833em; padding: .35em .75em; border: 1px solid #8fb260;
+  border-radius: .5em; background: transparent; color: var(--accent);
+  cursor: pointer; transition: background-color .15s, border-color .15s;
+}
+.st-login__button:hover { background: rgba(197,240,122,.08); }
+.st-login__google { width: 100%; font-weight: 600 !important; }
+.st-login__divider { display: flex; align-items: center; gap: .75em; margin: 1em 0 .9167em; color: var(--muted); font-size: .9167em; }
+.st-login__divider::before, .st-login__divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.st-login__field + .st-login__field { margin-top: 2.1667em; }
+.st-login__label { display: block; margin-bottom: .25em; font-weight: 600; }
+.st-login__input {
+  display: block; width: 100%; min-width: 0; height: 2.75em;
+  padding: .4em .75em; border: 1px solid #3b503f; border-radius: .5em;
+  background: var(--input-bg); color: var(--text);
+}
+.st-login__password { display: flex; gap: .4167em; }
+.st-login__password .st-login__input { flex: 1; }
+.st-login__toggle { width: 48px; min-width: 48px; min-height: 48px; flex: 0 0 48px; padding: 0; border-color: #3b503f; background: var(--input-bg); }
+.st-login__toggle-icon { width: 22px; height: 22px; stroke-width: 1.8; }
+.st-login__input[aria-invalid="true"] { border-color: #f07872; border-width: 2px; }
+.st-login__error { margin: .4em 0 0; color: #f07872; font-size: .8333em; line-height: 1.5; font-weight: 600; }
+.st-login .st-login__submit { width: 100%; margin-top: 4em; border-color: var(--accent); font-weight: 600; background: var(--accent); color: var(--page-bg); }
+.st-login .st-login__submit:hover { background: #d2f69b; }
+.st-login__links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 12px; margin-top: .75em; font-size: .9167em; line-height: 1.5; }
+.st-login__links a { text-underline-offset: 2px; }
+.st-login__links a:hover { color: #e1ffb5; }
+@media (prefers-reduced-motion: reduce) { .st-login__button { transition: none; } }
+
+
+
+/* Match the registration form's responsive scale without changing the shared header. */
+@media (max-width: 600px) {
+  .st-login__main { font-size: 14px; }
+  .st-login__form { max-width: 26em; }
+  .st-login__input { font-size: 16px; height: 44px; }
+  .st-login__button { min-height: 44px; }
+  .st-login__field + .st-login__field { margin-top: 1.5em; }
+  .st-login .st-login__submit { margin-top: 2.5em; }
+}

@@ -1,0 +1,1081 @@
+/* Only styles inside .skill-map-page; shared header lives in shared-components/PageHeader.css */
+/* Skill Tree — React / RWD dashboard. */
+/* 01. Design tokens and reset */
+.skill-map-page {
+  color-scheme: dark;
+  --bg: #191d20;
+  --sidebar: #202427;
+  --panel: #24292c;
+  --surface: #2a3033;
+  --border: #3a4144;
+  --text: #f0f2f1;
+  --muted: #aeb8b8;
+  --subtle: #829090;
+  --accent: #b3e77c;
+  --accent-ink: #1d2b18;
+  --accent-soft: #35472f;
+  --locked: #788185;
+  --radius: 14px;
+  --space: clamp(16px, 2vw, 30px);
+  --sidebar-width: 248px;
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    "Noto Sans TC",
+    "Microsoft JhengHei",
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.skill-map-page *,
+.skill-map-page *::before,
+.skill-map-page *::after {
+  box-sizing: border-box;
+}
+.skill-map-page {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+.skill-map-page .ui-icon {
+  width: 21px;
+  height: 21px;
+  flex: none;
+  vertical-align: middle;
+}
+/* 02. Desktop shell and navigation */
+.skill-map-page.app-layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  min-height: 100dvh;
+}
+.skill-map-page .main-content {
+  min-width: 0;
+  padding: 24px var(--space) 28px;
+}
+.skill-map-page .map-intro > p:first-child {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.11em;
+}
+
+/* 03. Skill cards and React skill selection */
+.skill-map-page .skill-selector {
+  margin-bottom: 24px;
+}
+.skill-map-page .skill-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.skill-map-page .skill-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 85px;
+  height: 100%;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid #454d50;
+  border-radius: 10px;
+  transition:
+    background 0.16s,
+    border-color 0.16s;
+}
+.skill-map-page .skill-card:hover {
+  border-color: var(--accent);
+}
+.skill-map-page .skill-icon {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+.skill-map-page .skill-card-text {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.skill-map-page .skill-card strong {
+  font-size: 17px;
+  line-height: 1.25;
+}
+.skill-map-page .skill-card span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.skill-map-page .skill-card span:last-child {
+  color: var(--subtle);
+  font-size: 10px;
+}
+/* React state selects the active skill. */
+.skill-map-page .skill-card {
+  width: 100%;
+  text-align: left;
+}
+.skill-map-page .skill-card[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.skill-map-page .skill-card[aria-pressed="true"] span {
+  color: #405536;
+}
+.skill-map-page .learning-map,
+.skill-map-page .task-panel {
+  display: flex;
+}
+/* 04. Dashboard: learning map and detail panel */
+.skill-map-page .learning-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 320px);
+  align-items: stretch;
+  gap: 16px;
+}
+.skill-map-page .learning-maps {
+  display: flex;
+  min-width: 0;
+}
+.skill-map-page .learning-map,
+.skill-map-page .task-panel {
+  flex-direction: column;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid #353c3f;
+  border-radius: var(--radius);
+}
+.skill-map-page .learning-map {
+  padding: 20px;
+  gap: 18px;
+  scroll-margin-top: 310px;
+}
+.skill-map-page .map-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.skill-map-page .map-intro {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.skill-map-page .map-intro h2 {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: clamp(21px, 2vw, 28px);
+  margin: 8px 0 5px;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+}
+.skill-map-page .map-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  color: var(--accent);
+}
+.skill-map-page .map-intro > p:last-child {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 420px;
+}
+.skill-map-page .map-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  flex: 1 1 290px;
+}
+.skill-map-page .map-stats > div {
+  border-left: 1px solid var(--border);
+  padding: 4px 10px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 3px;
+}
+.skill-map-page .map-stats dt {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.skill-map-page .map-stats dd {
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.skill-map-page .map-stats > div:last-child dd {
+  color: var(--accent);
+}
+.skill-map-page .map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 11px 0 0;
+  border-top: 1px solid var(--border);
+}
+.skill-map-page .map-toolbar p {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.skill-map-page .map-toolbar .ui-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+.skill-map-page .view-switch {
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  gap: 2px;
+}
+.skill-map-page .view-switch button {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--muted);
+}
+.skill-map-page .view-switch button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+/* 05. Scrollable vertical skill path. The CSS connector links ordered nodes. */
+.skill-map-page .map-viewport {
+  min-height: 260px;
+  height: clamp(340px, calc(100dvh - 505px), 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #505d54 #212628;
+  scrollbar-width: thin;
+  border: 1px solid #343c3f;
+  border-radius: 10px;
+  background-color: #202527;
+  background-image: radial-gradient(#384143 0.8px, transparent 0.8px);
+  background-size: 20px 20px;
+  padding: 18px 18px 22px;
+}
+.skill-map-page .skill-path {
+  max-width: 640px;
+  margin: auto;
+}
+.skill-map-page .skill-unit + .skill-unit {
+  margin-top: 18px;
+}
+.skill-map-page .unit-header {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: center;
+  border: 1px solid #43543c;
+  border-radius: 9px;
+  padding: 12px 15px;
+  background: #2e3a2d;
+}
+.skill-map-page .unit-header p:first-child {
+  grid-column: 1/-1;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+.skill-map-page .unit-header h3 {
+  font-size: 17px;
+  font-weight: 650;
+}
+.skill-map-page .unit-header p:last-child {
+  font-size: 12px;
+  color: #c0cbbd;
+}
+.skill-map-page .node-list {
+  --step: 113px;
+  --offset: 42px;
+  padding: 17px 0 3px;
+  position: relative;
+}
+.skill-map-page .skill-node {
+  --x: 0px;
+  --skew: 0deg;
+  --anchor: 39%;
+  height: var(--step);
+  position: relative;
+}
+.skill-map-page .skill-node:nth-child(4n + 1) {
+  --x: 0px;
+  --skew: 20.4deg;
+}
+.skill-map-page .skill-node:nth-child(4n + 2) {
+  --x: var(--offset);
+  --skew: -20.4deg;
+}
+.skill-map-page .skill-node:nth-child(4n + 3) {
+  --x: 0px;
+  --skew: -20.4deg;
+}
+.skill-map-page .skill-node:nth-child(4n + 4) {
+  --x: calc(-1 * var(--offset));
+  --skew: 20.4deg;
+}
+.skill-map-page .skill-node:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 38px;
+  left: calc(var(--anchor) + var(--x));
+  height: var(--step);
+  border-left: 2px dashed #626e70;
+  transform: skewX(var(--skew));
+  transform-origin: top;
+  pointer-events: none;
+}
+/* A final short connector toward the next unit header. */
+.skill-map-page .skill-unit:not(:last-child) .skill-node:last-child::after {
+  content: "";
+  position: absolute;
+  top: 38px;
+  bottom: -24px;
+  left: calc(var(--anchor) + var(--x));
+  border-left: 2px dashed #626e70;
+  pointer-events: none;
+}
+.skill-map-page .node-button {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  left: calc(var(--anchor) + var(--x) - 30px);
+  right: 0;
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  column-gap: 14px;
+  text-align: left;
+  align-items: center;
+}
+.skill-map-page .node-icon {
+  grid-row: 1/4;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1.5px solid #727e80;
+  background: #30373a;
+  color: #c0c9c9;
+  font-size: 17px;
+  font-weight: 750;
+  box-shadow: 0 3px 0 #151a1c;
+}
+.skill-map-page .node-icon svg {
+  width: 25px;
+  height: 25px;
+}
+.skill-map-page .node-title {
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+.skill-map-page .node-stars {
+  font-size: 15px;
+  line-height: 1.2;
+  letter-spacing: 2px;
+  color: #879294;
+}
+.skill-map-page .node-status {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 20px;
+  color: #c3caca;
+  background: #353c3f;
+  border: 1px solid #434c4e;
+  white-space: nowrap;
+}
+.skill-map-page .node-status svg {
+  width: 11px;
+  height: 11px;
+}
+.skill-map-page .is-available .node-icon,
+.skill-map-page .is-completed .node-icon {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 3px 0 #72954e;
+}
+.skill-map-page .is-available .node-status,
+.skill-map-page .is-completed .node-status,
+.skill-map-page .is-in-progress .node-status {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: #4e6841;
+}
+.skill-map-page .is-available .node-button:hover .node-icon {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.skill-map-page .is-in-progress .node-icon {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.skill-map-page .is-completed .node-stars,
+.skill-map-page .is-in-progress .node-stars {
+  color: var(--accent);
+}
+.skill-map-page .skill-node.is-completed::after {
+  border-color: var(--accent);
+  border-left-style: solid;
+}
+.skill-map-page .node-unit-challenge .node-icon,
+.skill-map-page .node-final-challenge .node-icon {
+  border-radius: 17px;
+  border-color: #857954;
+  color: #d8c48a;
+}
+.skill-map-page .node-final-challenge .node-icon {
+  border: 2px solid #a89969;
+}
+.skill-map-page .node-final-challenge .node-title {
+  color: #e6d6a8;
+}
+/* 06. Progress and task details */
+.skill-map-page .map-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.skill-map-page .map-footer label,
+.skill-map-page .task-footer label {
+  font-weight: 650;
+  white-space: nowrap;
+}
+.skill-map-page .map-footer span {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.skill-map-page progress {
+  display: block;
+  width: 100%;
+  height: 10px;
+  border: 0;
+  border-radius: 99px;
+  overflow: hidden;
+  background: #41494b;
+  color: var(--accent);
+  accent-color: var(--accent);
+}
+.skill-map-page progress::-webkit-progress-bar {
+  background: #41494b;
+  border-radius: 99px;
+}
+.skill-map-page progress::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 99px;
+}
+.skill-map-page progress::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: 99px;
+}
+.skill-map-page .map-footer progress {
+  flex: 1;
+  min-width: 30px;
+}
+.skill-map-page .task-panel {
+  padding: 22px;
+  position: sticky;
+  top: 22px;
+  gap: 18px;
+}
+.skill-map-page .task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.skill-map-page .task-header h2 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--accent);
+  font-size: 15px;
+}
+.skill-map-page .task-header h2 svg {
+  width: 17px;
+  height: 17px;
+}
+.skill-map-page .task-node-id {
+  border: 1px solid #698754;
+  border-radius: 7px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.skill-map-page .task-icon {
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+.skill-map-page .task-content h3 {
+  font-size: 23px;
+  line-height: 1.35;
+  margin-bottom: 10px;
+  letter-spacing: -0.03em;
+}
+.skill-map-page .task-description {
+  color: #c5cdcc;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.skill-map-page .task-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 17px;
+}
+.skill-map-page .task-tags li {
+  font-size: 11px;
+  border: 1px solid #4b5651;
+  border-radius: 99px;
+  padding: 3px 10px;
+  color: #c7d0c8;
+  background: #2d3732;
+}
+.skill-map-page .task-meta {
+  padding: 15px 0;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
+  font-size: 13px;
+}
+.skill-map-page .task-meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.skill-map-page .task-meta dd {
+  color: var(--muted);
+  text-align: right;
+}
+.skill-map-page .task-content h4 {
+  font-size: 14px;
+  margin: 2px 0 9px;
+}
+.skill-map-page .task-objectives {
+  display: grid;
+  gap: 8px;
+}
+.skill-map-page .task-objectives li {
+  display: flex;
+  gap: 9px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #d2d8d6;
+}
+.skill-map-page .task-objectives li::before {
+  content: "✓";
+  color: var(--accent);
+  font-weight: 750;
+}
+.skill-map-page .task-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  font-size: 13px;
+}
+.skill-map-page .task-footer span {
+  grid-column: 2;
+  grid-row: 1;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
+}
+.skill-map-page .task-footer progress,
+.skill-map-page .start-learning,
+.skill-map-page .task-note {
+  grid-column: 1/-1;
+}
+.skill-map-page .start-learning {
+  margin-top: 8px;
+  min-height: 48px;
+  border-radius: 9px;
+  background: #9fc96f;
+  color: var(--accent-ink);
+  font-weight: 750;
+  font-size: 16px;
+}
+.skill-map-page .start-learning:disabled {
+  opacity: 0.8;
+}
+.skill-map-page .task-note {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+}
+/* 07. Responsive breakpoints */
+@media (max-width: 1350px) {
+  .skill-map-page .skill-card {
+    gap: 8px;
+    padding: 10px;
+  }
+  .skill-map-page .skill-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .skill-map-page .learning-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 285px);
+  }
+  .skill-map-page .learning-map {
+    padding: 16px;
+  }
+  .skill-map-page .task-panel {
+    padding: 18px;
+  }
+}
+@media(max-width:940px){ .skill-map-page.app-layout {grid-template-columns:minmax(0,1fr);} }
+@media (max-width: 850px) {
+  .skill-map-page .learning-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .skill-map-page .task-panel {
+    position: static;
+  }
+  .skill-map-page .map-viewport {
+    height: clamp(360px, 60dvh, 620px);
+  }
+  .skill-map-page .skill-list {
+    display: flex;
+    overflow-x: auto;
+    padding: 3px 3px 10px;
+    margin: -3px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    scrollbar-color: #505d54 transparent;
+  }
+  .skill-map-page .skill-item {
+    flex: 0 0 155px;
+    scroll-snap-align: start;
+  }
+  .skill-map-page .task-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 22px;
+  }
+  .skill-map-page .task-icon,
+.skill-map-page .task-content h3,
+.skill-map-page .task-description,
+.skill-map-page .task-tags {
+    grid-column: 1;
+  }
+  .skill-map-page .task-meta {
+    grid-column: 2;
+    grid-row: 1/3;
+    border-top: 0;
+    align-content: start;
+    padding-top: 4px;
+  }
+  .skill-map-page .task-content h4 {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .skill-map-page .task-objectives {
+    grid-column: 2;
+    grid-row: 4/6;
+  }
+}
+@media (max-width: 600px) {
+  .skill-map-page {
+    --space: 13px;
+  }
+  .skill-map-page.app-layout {
+    display: block;
+  }
+  .skill-map-page .main-content {
+    padding-top: 20px;
+  }
+  .skill-map-page .skill-selector {
+    margin-bottom: 16px;
+  }
+  .skill-map-page .skill-item {
+    flex-basis: 145px;
+  }
+  .skill-map-page .skill-card {
+    min-height: 76px;
+  }
+  .skill-map-page .learning-map {
+    padding: 13px;
+    gap: 13px;
+    scroll-margin-top: 345px;
+  }
+  .skill-map-page .map-header {
+    gap: 13px;
+  }
+  .skill-map-page .map-intro h2 {
+    font-size: 23px;
+  }
+  .skill-map-page .map-stats {
+    flex-basis: 100%;
+  }
+  .skill-map-page .map-stats > div {
+    padding: 4px 6px;
+  }
+  .skill-map-page .map-stats > div:first-child {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .skill-map-page .map-stats dd {
+    font-size: 15px;
+  }
+  .skill-map-page .map-stats dt {
+    font-size: 10px;
+  }
+  .skill-map-page .map-toolbar {
+    gap: 8px;
+  }
+  .skill-map-page .view-switch button {
+    font-size: 11px;
+    padding: 4px 6px;
+  }
+  .skill-map-page .map-viewport {
+    padding: 11px 9px 17px;
+    height: clamp(350px, 56dvh, 520px);
+    overscroll-behavior: auto;
+  }
+  .skill-map-page .unit-header {
+    padding: 10px;
+  }
+  .skill-map-page .unit-header h3 {
+    font-size: 15px;
+  }
+  .skill-map-page .unit-header p:last-child {
+    font-size: 11px;
+  }
+  .skill-map-page .node-list {
+    --step: 100px;
+    --offset: 25px;
+  }
+  .skill-map-page .skill-node {
+    --anchor: 31%;
+  }
+  .skill-map-page .skill-node:nth-child(4n + 1),
+.skill-map-page .skill-node:nth-child(4n + 4) {
+    --skew: 14deg;
+  }
+  .skill-map-page .skill-node:nth-child(4n + 2),
+.skill-map-page .skill-node:nth-child(4n + 3) {
+    --skew: -14deg;
+  }
+  .skill-map-page .skill-node:not(:last-child)::after {
+    top: 34px;
+  }
+  .skill-map-page .skill-node:last-child::after {
+    top: 34px;
+  }
+  .skill-map-page .node-button {
+    left: calc(var(--anchor) + var(--x) - 26px);
+    grid-template-columns: 52px minmax(0, 1fr);
+    column-gap: 9px;
+  }
+  .skill-map-page .node-icon {
+    width: 52px;
+    height: 52px;
+    font-size: 15px;
+  }
+  .skill-map-page .node-title {
+    font-size: 13px;
+  }
+  .skill-map-page .node-stars {
+    font-size: 13px;
+  }
+  .skill-map-page .map-footer {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 7px;
+  }
+  .skill-map-page .map-footer progress {
+    grid-column: 1/-1;
+    grid-row: 2;
+  }
+  .skill-map-page .map-footer span {
+    text-align: right;
+  }
+  .skill-map-page .task-panel {
+    padding: 17px;
+  }
+  .skill-map-page .task-content {
+    display: block;
+  }
+  .skill-map-page .task-meta {
+    border-top: 1px solid var(--border);
+    padding: 15px 0;
+  }
+  .skill-map-page .task-panel {
+    scroll-margin-top: 12px;
+  }
+  
+}
+@media (max-width: 360px) {
+  .skill-map-page .map-stats dt {
+    font-size: 9px;
+  }
+  .skill-map-page .map-toolbar .view-switch {
+    width: 100%;
+  }
+  .skill-map-page .view-switch button {
+    flex: 1;
+  }
+  .skill-map-page .skill-node {
+    --anchor: 29%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skill-map-page *,
+.skill-map-page *::before,
+.skill-map-page *::after {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 08. Interactive states */
+.skill-map-page .node-button[aria-pressed="true"] .node-icon {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.skill-map-page .is-locked .node-button {
+  opacity: 0.8;
+}
+.skill-map-page .is-locked .node-button[aria-pressed="true"] .node-icon {
+  outline-color: var(--muted);
+}
+.skill-map-page .node-button:hover .node-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.skill-map-page .node-unit-challenge.is-completed .node-icon,
+.skill-map-page .node-final-challenge.is-completed .node-icon,
+.skill-map-page .node-unit-challenge.is-available .node-icon,
+.skill-map-page .node-final-challenge.is-available .node-icon {
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.skill-map-page .map-list .node-list {
+  padding: 10px 0;
+  display: grid;
+  gap: 7px;
+}
+.skill-map-page .map-list .skill-node {
+  height: auto;
+}
+.skill-map-page .map-list .skill-node::after {
+  display: none;
+}
+.skill-map-page .map-list .node-button {
+  position: static;
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  grid-template-columns: 42px minmax(0, 1fr);
+}
+.skill-map-page .map-list .node-icon {
+  width: 42px;
+  height: 42px;
+  font-size: 14px;
+}
+.skill-map-page .map-list .node-button[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+.skill-map-page .map-list .node-button[aria-pressed="true"] .node-icon {
+  outline: none;
+}
+.skill-map-page .task-note {
+  line-height: 1.6;
+}
+.skill-map-page .start-learning:not(:disabled) {
+  background: var(--accent);
+}
+.skill-map-page .start-learning:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+.skill-map-page .start-learning:disabled {
+  background: #41494b;
+  color: var(--muted);
+}
+.skill-map-page .secondary-action {
+  grid-column: 1/-1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 40px;
+  color: var(--muted);
+}
+.skill-map-page .reset-button {
+  margin-top: 12px;
+  grid-column: 1/-1;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.skill-map-page .storage-warning {
+  color: #f2d998;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.skill-map-page .demo-banner {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+.skill-map-page .learning-dialog {
+  width: min(480px, calc(100% - 28px));
+  max-height: 85dvh;
+  overflow: auto;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  padding: 24px;
+}
+.skill-map-page .learning-dialog::backdrop {
+  background: #101416ba;
+}
+.skill-map-page .learning-dialog h2 {
+  margin: 8px 0 12px;
+  font-size: 23px;
+}
+.skill-map-page .learning-dialog p {
+  margin-bottom: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.skill-map-page .learning-dialog .dialog-eyebrow {
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.skill-map-page .dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 20px;
+}
+.skill-map-page .dialog-actions button {
+  min-height: 44px;
+  border-radius: 8px;
+  padding: 8px;
+}
+.skill-map-page .dialog-actions .start-learning {
+  margin: 0;
+  grid-column: auto;
+}
+.skill-map-page .dialog-actions .secondary-action {
+  grid-column: auto;
+}
+.skill-map-page .task-state {
+  font-size: 12px;
+  color: var(--muted);
+}
+.skill-map-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.skill-map-page .skill-card span.skill-card-text {
+  display: grid;
+  color: inherit;
+}
+
+/* 桌機版：學習地圖與右側任務面板底部切齊 */
+@media (min-width: 851px) {
+  .skill-map-page .learning-layout {
+    align-items: stretch;
+  }
+
+  .skill-map-page .learning-maps {
+    display: flex;
+  }
+
+  .skill-map-page .learning-map {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .skill-map-page .map-viewport {
+    flex: 1 1 0;
+    height: 0;
+    min-height: 260px;
+  }
+}
+
+/* 歷史測驗紀錄按鈕 */
+.skill-map-page .history-button {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+
+  background: transparent;
+  border: 1px solid #6e9257;
+  border-radius: 9px;
+
+  color: #b3e77c;
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.skill-map-page .history-button:hover {
+  background: #35472f;
+  border-color: #b3e77c;
+}
+
+/* 歷史紀錄視窗樣式 */
+
+/* Narrow reset: does not affect the team's shared Sidebar or PageHeader. */
+.skill-map-page .skill-selector :is(ul,ol),
+.skill-map-page .learning-layout :is(ul,ol) { list-style:none; padding:0; margin:0; }
+.skill-map-page .learning-layout :is(h1,h2,h3,h4,p,dl,dd,blockquote) { margin:0; }
+.skill-map-page :where(.skill-selector button, .learning-layout button, .learning-dialog button) { font:inherit; color:inherit; border:0; background:transparent; padding:0; cursor:pointer; }
+.skill-map-page .learning-layout button:disabled {cursor:not-allowed;}
+.skill-map-page .skill-selector button:focus-visible,
+.skill-map-page .learning-layout button:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+
+.skill-map-page .integration-notice {padding:9px 12px;margin:0 0 12px;border:1px solid #56694a;border-radius:7px;background:#29382c;color:#d5ebc9;font-size:13px;}
+/* Team Sidebar integration: original sidebar CSS removed; this page uses shared Sidebar.jsx. */
+.skill-map-page { min-width:0; background:var(--bg); color:var(--text); box-sizing:border-box; }
+.skill-map-page .map-toolbar-controls {display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.skill-map-page .map-reset-button {padding:6px 11px; border:1px solid var(--border); border-radius:7px; font-size:12px; color:var(--muted); background:transparent; cursor:pointer;}
+.skill-map-page .map-reset-button:hover {border-color:var(--accent); color:var(--accent);}
