@@ -32,7 +32,7 @@
 2. **快照欄位相容。** migration 010 對舊資料以技能標題（空白時退回 `skill_id`）回填，之後設 `NOT NULL`；C 建立新 attempt 時需提供非空 `skill_title_snapshot`。C PR #93 已寫入此欄位。
 3. **統一錯誤碼與取消重試。** C PR 實際回 `409 IDEMPOTENCY_KEY_CONFLICT`（同 key 不同本文）。相同 key 的 attempt 若後來已取消，重送會回原 attempt（`200`，`status: "cancelled"`），不建立新 attempt；讀取已取消 attempt 回 `404 ATTEMPT_NOT_FOUND`。新一場需新 key。C PR #93 目前取消同一會員、同一技能的舊進行中 attempt；共用 app 整合測試需確認這個範圍。
 4. **維持答案隔離與鎖定。** C router 的讀題 response 不應包含正解或解析；已作答題目只可回傳所選答案及答對／答錯，不可改寫答案。完整正解與解析只在五題結算後提供。正解只保留於 DB snapshot 及可信任 server code。PR #93 尚未包含 answer submit/result route，前端不可把它們視為已可呼叫。
-5. **接上共同 Express。** E 的 `backend/src/app.js` 不註冊 C router，直到 C PR 合併或另行取得整合版 router；CORS、body parser、request ID、標準錯誤和 E migration 都需在同一 app／測試 DB 驗證。
+5. **接上共同 Express，保留 E 的 server 啟動層。** E 的 `backend/src/app.js` 不註冊 C router，直到 C PR 合併或另行取得整合版 router。C PR #93 也修改 `backend/src/server.js`，但該 PR 的版本仍自行建立 Express app；E PR #94 已把路由與安全 middleware 組裝移到 `app.js`，`server.js` 只負責啟動和關閉服務。整合時應將 `quizzesRouter` 的 import／mount 加到 E 的 `app.js`（放在共用 middleware 之後、`notFound` 之前），保留 E 的 `server.js`，不要把 C 的舊 server bootstrap 整份覆蓋回來。最後在同一 app／隔離測試 DB 驗證 CORS、body parser、rate limit、request ID、標準錯誤和 E migration。
 
 ## E 提供的可用性 API
 
