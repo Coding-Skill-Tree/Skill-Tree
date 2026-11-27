@@ -1,0 +1,69 @@
+/* Skill Tree — shared auth layout and header. */
+.st-login {
+  --page-bg: #0d140f;
+  --panel-bg: #162119;
+  --input-bg: #111a13;
+  --border: #293b2e;
+  --input-border: #405747;
+  --accent: #c5f07a;
+  --text: #eef5e9;
+  --muted: #91a69a;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--page-bg);
+  color: var(--text);
+  font: 13px/1.5 Arial, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  color-scheme: dark;
+  display: flex;
+  flex-direction: column;
+}
+.st-login, .st-login * { box-sizing: border-box; }
+.st-login button, .st-login input { font: inherit; }
+.st-login a { color: var(--accent); }
+.st-login button, .st-login a { -webkit-tap-highlight-color: transparent; }
+.st-login :is(button, a, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.st-login__header {
+  min-height: 76px;
+  padding: 12px 28px;
+  flex-shrink: 0;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.st-login .st-login__brand {
+  display: inline-flex; align-items: flex-start; gap: 12px;
+  color: var(--text); text-decoration: none;
+}
+.st-login__brand-icon { width: 34px; height: 34px; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+.st-login__brand-text { display: flex; flex-direction: column; gap: 3px; }
+.st-login__brand-name { font-size: 26px; line-height: 1.12; font-weight: 700; letter-spacing: -.7px; }
+.st-login__brand-caption { font-size: 12px; line-height: 1.5; color: var(--muted); font-weight: 400; white-space: nowrap; }
+.st-login__nav { display: flex; gap: 8px; flex-shrink: 0; }
+.st-login__nav a {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 50px; min-height: 34px; padding: 5px 11px;
+  border: 1px solid var(--accent); border-radius: 8px;
+  font-size: 13px; text-decoration: none;
+}
+.st-login .st-login__nav-register { color: var(--page-bg); background: var(--accent); }
+@media (max-width: 480px) {
+  .st-login__header { min-height: 68px; padding: 10px 16px; gap: 8px; }
+  .st-login .st-login__brand { gap: 8px; }
+  .st-login__brand-icon { width: 28px; height: 28px; }
+  .st-login__brand-name { font-size: 22px; }
+  .st-login__brand-caption { font-size: 11px; }
+  .st-login__nav a { min-height: 40px; }
+}
+@media (max-width: 350px) {
+  .st-login__header { padding-inline: 10px; }
+  .st-login__brand-name { font-size: 20px; }
+  .st-login__brand-caption { font-size: 10px; }
+  .st-login__nav a { min-width: 44px; padding-inline: 8px; }
+}
+
+.st-login__nav a:not(.st-login__nav-register):hover { background: rgba(197,240,122,.08); }
+.st-login [hidden] { display: none !important; }
+.st-login .st-login__nav-register:hover { background: #d2f69b; }
