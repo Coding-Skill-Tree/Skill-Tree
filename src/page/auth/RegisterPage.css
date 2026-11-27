@@ -9,6 +9,7 @@
   --st-accent: #c5f07a;
   --st-text: #e9efe6;
   --st-muted: #91a395;
+  --st-danger: #f07872;
   flex: 1;
   background: var(--st-bg);
   color: var(--st-text);
@@ -33,11 +34,16 @@
 .st-register-field label { font-weight: 600; }
 .st-register-input { width: 100%; min-width: 0; height: 2.75em; padding: .4em .75em; color: var(--st-text); background: var(--st-input); border: 1px solid var(--st-input-border); border-radius: .5em; outline: none; }
 .st-register-input:focus { border-color: var(--st-accent); box-shadow: 0 0 0 2px #c5f07220; }
+.st-register-input[aria-invalid="true"] { border-color: var(--st-danger); border-width: 2px; }
 .st-register-email { margin-bottom: 2.1667em; }
 .st-register-password { margin-bottom: 1em; }
 .st-register-password-row { display: flex; gap: .4167em; }
-.st-register-toggle { width: 3.75em; flex: 0 0 3.75em; background: var(--st-input); border: 1px solid var(--st-input-border); border-radius: .5em; color: var(--st-accent); font-size: .9167em !important; font-weight: 600 !important; }
-.st-register-hint { margin: -.1em 0 0 .5em; font-size: .8333em; }
+.st-register-toggle { width: 48px; min-width: 48px; min-height: 48px; flex: 0 0 48px; padding: 0; background: var(--st-input); border: 1px solid var(--st-input-border); border-radius: .5em; color: var(--st-accent); }
+.st-register-toggle-icon { width: 22px; height: 22px; stroke-width: 1.8; }
+.st-register-hint { margin: -.1em 0 0 .5em; font-size: .8333em; color: var(--st-muted); }
+.st-register-error, .st-register-success { margin: 0; font-size: .8333em; line-height: 1.5; font-weight: 600; }
+.st-register-error { display: flex; align-items: flex-start; gap: .4em; color: var(--st-danger); }
+.st-register-success { margin-top: .9167em; color: var(--st-accent); }
 .st-register-submit { margin-top: 4em; background: var(--st-accent); color: var(--st-bg); border-color: var(--st-accent); }
 .st-register-submit:hover { background: #d5fa97; }
 .st-register-login { margin: .75em 0 0; font-size: .9167em; }

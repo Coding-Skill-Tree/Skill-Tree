@@ -9,7 +9,6 @@ export const ROUTES = {
   onboarding: "../onboarding/index.html",
   learn: "/learn",
   profile: "/profile",
-  dashboard: "/dashboard",
 };
 
 export const PROFILE_TEXT = {
@@ -21,10 +20,13 @@ export const PROFILE_TEXT = {
     email: "Email",
     joinDate: "加入日期",
   },
-  entryTitle: "前往",
-  entryDescription: "查看你的 XP、等級與學習進度",
-  entryButton: "查看遊戲數據",
-  backToMap: "回到技能樹地圖",
+  edit: "編輯",
+  editLabel: "編輯基本資料",
+  save: "儲存",
+  saving: "儲存中…",
+  cancel: "取消",
+  saveFailed: "儲存失敗，請再試一次",
+  usernameTaken: "此暱稱已被使用",
   logout: "登出",
   loggingOut: "登出中…",
   loading: "載入中…",
@@ -44,4 +46,8 @@ export const DEMO_LINKS = [
   { label: "載入失敗（按重試會成功）", href: "./index.html?demo=error" },
   { label: "未完成建立角色", href: "./index.html?demo=not-onboarded" },
   { label: "未登入", href: "./index.html?demo=signed-out" },
+  { label: "儲存失敗", href: "./index.html?demo=save-error" },
 ];
+
+// 示範用：這些暱稱已被其他學習者使用，儲存時會顯示「此暱稱已被使用」
+export const DEMO_TAKEN_NICKNAMES = ["Coder_01", "野豬騎士"];

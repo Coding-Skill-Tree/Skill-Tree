@@ -20,6 +20,9 @@ const Home = () => {
         <NavLink to="/admin" className="navList">
           Admin
         </NavLink>
+        <NavLink to="/register" className="navList">
+          Register
+        </NavLink>
       </nav>
     </div>
   );
