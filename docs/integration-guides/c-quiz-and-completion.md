@@ -17,6 +17,21 @@ PR #93 提供 `POST /api/quizzes/attempts` 建立測驗，以及 `GET /api/quizz
 
 完整重試規則見[Idempotency-Key 使用說明](../idempotency-key-guide.md)。
 
+## 與 E 已確認的 C v1 規則
+
+這些流程決議來自 [PR #88 的 C × E 規格討論](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/88#issuecomment-7212566961)。答案提交與結果 API 的完整 request／response 欄位尚未由 C 定稿；以下規則可先作為實作與驗收基準：
+
+| 流程 | 已確認規則 | 實作／待確認 |
+| --- | --- | --- |
+| MVP 題庫 | 目標為 5 個技能；每項至少 5 道合格正式題；每場隨機抽 5 題。只採單選、固定 3 個選項、1 個正解。 | 五個正式 `skillId` 與教材 ready 的正式資料來源尚待確認。C PR #93 仍用只有一筆 draft 的靜態教材 gate，需改接共同可用性條件或定義資料來源。 |
+| 題目識別 | 以 `attemptId` + `ordinal` 識別測驗快照中的題目；ordinal 須在固定範圍 1–5。 | C 答案 API 尚未出現在 PR #93，提交格式和完整驗證錯誤需由 C 補上。 |
+| 答案鎖定 | 每題送出後不能修改；返回上一題只能檢視，不能重新作答；需按「下一題」繼續。 | C answer route／前端仍待完成；需驗證重送不會造成重複判分或更改答案。 |
+| 題中回饋 | 提交後只顯示答對或答錯；不回傳正確選項或完整解析。 | PR #93 的讀題 route 已作答時只回傳選擇與 `isCorrect`；完整作答流程尚未提供。 |
+| 結算 | 五題完成後才顯示總成績、通過狀態、各題正解與解析。 | 結果 route 尚未實作；應從資料庫快照計分，不信任前端分數。 |
+| 取消與重開 | 保留舊 attempt 並標記 `cancelled`；不可續答、不可重啟、不可列入完成歷史；另開新測驗使用新 key。 | PR #93 目前取消同會員、同技能的舊進行中測驗；共用 DB 整合回歸需確認原子性和取消範圍。 |
+| 歷史 | 沿用 E `GET /api/progress/history`；C 首次載入 10 筆，續頁傳 `nextCursor` 並沿用相同 `skillId` 篩選。 | E route 已實作 `skillId`、`limit`、`cursor`；預設 limit 20、最大 50。 |
+| 永久通過與 XP | C 負責判分；E completion service 維護永久通過和 revision，只有首次通過才產生 XP outbox event。 | 是否允許已永久通過的技能重考仍待 C 確認；D worker 尚待實作。 |
+
 ## E 提供的共用依賴
 
 - **Migration 010**：將舊 attempt 的 `skill_title_snapshot` 回填後設成 `NOT NULL`；新增 `idempotency_key`、32-byte SHA-256 fingerprint、會員/key 唯一索引及已完成學習歷史 view。
@@ -26,6 +41,8 @@ PR #93 提供 `POST /api/quizzes/attempts` 建立測驗，以及 `GET /api/quizz
 - **`recordSkillCompletion(database, { userId, skillId, attemptId })`**：必須在已通過 attempt 結算的同一 transaction 使用；首次通過才新增永久完成紀錄及增加 progress revision。
 - **`enqueueSkillFirstPassXpEvent(database, { userId, skillId, attemptId })`**：首次通過時寫入 outbox，最終 XP 金額由 D 規則決定。
 - **`GET /api/progress/history`**：查詢已完成測驗的共用歷史 projection，不重複建立 C 專用 history。
+
+呼叫歷史 API 時，`skillId` 為選填；C 首頁面可帶 `limit=10`。後續頁將 `nextCursor` 原樣傳回 `cursor`，並沿用原本的 `skillId` 篩選。E route 以 `completedAt DESC, activityId DESC` 穩定排序，只回傳已完成測驗；`cancelled` 和 `in_progress` 不進歷史。
 
 `database` 參數應傳同一個 PostgreSQL transaction client。會員身份只能取自已驗證的 `request.member.id`，不要讀取瀏覽器提供的 `userId`。
 
@@ -40,8 +57,8 @@ PR #93 提供 `POST /api/quizzes/attempts` 建立測驗，以及 `GET /api/quizz
 
 下列項目是 C 測驗作答與結算範圍，E 的建立／讀題支援不代表它們已完成：
 
-- `POST /api/quizzes/attempts/:attemptId/answers`：驗證 owner、ordinal、單選索引和尚未作答狀態；由伺服器使用 snapshot 判分；已提交答案不可被改寫。
-- 結果讀取 endpoint：測驗完成後才回總分、pass/fail、每題正解和解析。作答階段不要洩漏答案索引或解析。
+- `POST /api/quizzes/attempts/:attemptId/answers`：驗證 owner、ordinal、三選一索引和尚未作答狀態；由伺服器使用 snapshot 判分；已提交答案不可被改寫。每題完成只回答對／答錯；返回上一題只能讀取，不能重答。
+- 結果讀取 endpoint：五題完成後才回總分、pass/fail、每題正解和解析。作答階段不要洩漏答案索引或解析。
 - 最後一題結算和永久完成／XP enqueue 要在單一 transaction 原子完成，避免重送重複產生完成、revision 或 XP 事件。
 
 實際 request/response、狀態和錯誤碼需由 C 確認後補入 OpenAPI。E 只提供 backend-only service；不要讓瀏覽器直接寫完成紀錄、XP 或 `userId`。

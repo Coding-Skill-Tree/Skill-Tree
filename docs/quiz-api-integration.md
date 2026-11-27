@@ -14,12 +14,24 @@
 | 學習歷史 | C 讀取完成測驗歷史 | E `GET /api/progress/history` 從 `user_learning_activity_history` 投影讀取 |
 | 作答與結算 | #93 diff 沒有答案提交或結果 route | 尚未提供。這不會由 E 的建立／讀題依賴取代 |
 
+## C × E 已確認的產品流程
+
+以下是 [PR #88 的 C 模組逐項決議](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/88#issuecomment-7212566961)，新接線需保持一致；答案 API 的完整 request／response 欄位仍由 C 在實作時定義。
+
+- MVP 目標為 5 個技能，每個技能至少 5 道合格正式題，每場隨機抽 5 題。五個正式 `skillId` 和教材 ready 的正式資料來源尚待確認。
+- C v1 只抽三選一、固定 3 選項、1 個正解的題目。正式題庫覆蓋率按這些規則計算，demo 題不列入。
+- 使用 `attemptId` + `ordinal`（1–5）定位作答快照。提交後答案鎖定；返回上一題只能檢視，不能重新作答，流程須按「下一題」前進。
+- 每題提交後只回傳答對／答錯，不提供正解或解析；完成五題後才在結果頁顯示成績、通過狀態、正解與解析。
+- 舊進行中 attempt 保留並標記 `cancelled`；不可續答、重新啟用或列入完成歷史。重送舊 key 仍回舊 attempt；另開一場必須用新 key。
+- C 負責測驗資格、抽題、作答與判分；E 提供永久完成狀態、revision、XP Outbox 和共用歷史。已永久通過的技能是否仍可重考尚待 C 確認。
+- 歷史沿用 `GET /api/progress/history`。C 第一頁取 10 筆，後續帶 `nextCursor`，並沿用相同的 `skillId` 篩選。
+
 ## 需要在合併前對齊的項目
 
 1. **把靜態教材 gate 換成共用可用性判斷。** C PR 的 `tutorials.js` 目前只有一筆 `status: "draft"`，`isTutorialReady()` 只接受 `published`，因此該技能也會被擋在 `409 TUTORIAL_NOT_READY`；其他技能不存在於這張靜態表。C 可在建立 route 的 transaction 中呼叫 E 的 `getQuizAvailability(client, { userId, skillId })`，再以 `listPublishedQuestionsForSkill(client, skillId)` 取得 server-only 的正式題庫。若仍需要課程 ready gate，請先讓該欄位有正式 DB/API 來源。
 2. **快照欄位相容。** migration 010 對舊資料以技能標題（空白時退回 `skill_id`）回填，之後設 `NOT NULL`；C 建立新 attempt 時需提供非空 `skill_title_snapshot`。C PR #93 已寫入此欄位。
-3. **統一錯誤碼與取消重試。** C PR 實際回 `409 IDEMPOTENCY_KEY_CONFLICT`（同 key 不同本文）。相同 key 的 attempt 若後來已取消，重送會回原 attempt（`200`，`status: "cancelled"`），不建立新 attempt；讀取已取消 attempt 回 `404 ATTEMPT_NOT_FOUND`。新一場需新 key。
-4. **維持答案隔離。** C router 的讀題 response 不應包含正解和解析；正解只保留於 DB snapshot 及可信任 server code。PR #93 尚未包含 answer submit/result route，前端不可把它們視為已可呼叫。
+3. **統一錯誤碼與取消重試。** C PR 實際回 `409 IDEMPOTENCY_KEY_CONFLICT`（同 key 不同本文）。相同 key 的 attempt 若後來已取消，重送會回原 attempt（`200`，`status: "cancelled"`），不建立新 attempt；讀取已取消 attempt 回 `404 ATTEMPT_NOT_FOUND`。新一場需新 key。C PR #93 目前取消同一會員、同一技能的舊進行中 attempt；共用 app 整合測試需確認這個範圍。
+4. **維持答案隔離與鎖定。** C router 的讀題 response 不應包含正解或解析；已作答題目只可回傳所選答案及答對／答錯，不可改寫答案。完整正解與解析只在五題結算後提供。正解只保留於 DB snapshot 及可信任 server code。PR #93 尚未包含 answer submit/result route，前端不可把它們視為已可呼叫。
 5. **接上共同 Express。** E 的 `backend/src/app.js` 不註冊 C router，直到 C PR 合併或另行取得整合版 router；CORS、body parser、request ID、標準錯誤和 E migration 都需在同一 app／測試 DB 驗證。
 
 ## E 提供的可用性 API

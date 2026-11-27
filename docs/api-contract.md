@@ -2,7 +2,7 @@
 
 這份文件是 A、B、C、D、E 共用的 API 對齊基準。路由以目前 Express 後端為準；沒有標示「已實作」的端點不得由前端假設存在。
 
-互動式 API Explorer：啟動本機前端及 API 後開啟 [API Explorer](http://localhost:5173/api/docs)；機器可讀的 OpenAPI 3.0 定義在 [backend/openapi.json](../backend/openapi.json)，非 production 環境提供 `/api/openapi.json`。Explorer 直接讀取 OpenAPI，不另維護第二份路由清單；production 不提供 Explorer 或 OpenAPI HTTP 路由。目前已實作測驗建立、題目快照讀取及共用學習歷史查詢；答案提交與測驗結果仍待 C 完成。題庫寫入和會員停權等 Explorer 操作會修改資料，請只連本機測試資料庫。
+互動式 API Explorer：啟動本機前端及 API 後開啟 [API Explorer](http://localhost:5173/api/docs)；機器可讀的 OpenAPI 3.0 定義在 [backend/openapi.json](../backend/openapi.json)，非 production 環境提供 `/api/openapi.json`。Explorer 直接讀取 OpenAPI，不另維護第二份路由清單；production 不提供 Explorer 或 OpenAPI HTTP 路由。E 此分支已掛載共用學習歷史查詢及測驗可用性查詢；C 的建立／讀題 API 在 PR #93，尚未掛到 E app；答案提交與測驗結果也尚未提供。題庫寫入和會員停權等 Explorer 操作會修改資料，請只連本機測試資料庫。
 
 ## 共通規則
 
@@ -179,13 +179,25 @@ C 的 [PR #93](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/93) 提供�
 
 C PR #93 的冪等結果為：第一次建題 `201`；相同會員、相同 key 和相同本文重送 `200` 並回同一 attempt；同 key 換本文回 `409 IDEMPOTENCY_KEY_CONFLICT`。原 attempt 若已取消，舊 key 重送仍回 `200` 且 `status: "cancelled"`，不重啟也不另建；讀取已取消 attempt 回 `404 ATTEMPT_NOT_FOUND`。新測驗需新 key。key 以 `(session userId, key)` 唯一，資料庫儲存本文 fingerprint；詳見[Idempotency-Key 使用說明](idempotency-key-guide.md)。
 
+### C × E 已確認的測驗流程規則
+
+以下整理自 [PR #88 的 C × E 規格確認](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/88#issuecomment-7212566961)。它們是流程決議；答案提交與結果 API 的完整欄位、狀態碼仍由 C 在實作前補成 API 規格。
+
+- **題庫與 MVP：** MVP 目標為 5 個技能，每個技能至少有 5 道符合 C v1 規格的正式題目；每場隨機抽 5 題。五個正式 `skillId` 和教材 ready 的正式資料來源尚待確認；未 ready 的技能不得開始測驗。
+- **題型：** C v1 只使用三選一單選題，每題固定 3 個選項和 1 個正解。E 題庫仍可保留多選與 2–10 個選項供其他用途。
+- **作答鎖定與回饋：** 每題提交後不得修改；返回已答題目只能檢視，不能再次作答，必須按「下一題」繼續。提交後只回饋答對／答錯，不顯示正解或解析；五題完成後才在結算頁顯示總成績、通過狀態、每題正解及解析。
+- **題目識別：** 作答用 `attemptId` + `ordinal`；ordinal 從 1 開始，必須落在該 attempt 固定的五題快照範圍內。
+- **取消與重開：** 舊進行中 attempt 保留資料並標記 `cancelled`；取消的測驗不可續答、不可重啟，也不列入完成歷史。相同舊 key 仍對應原 attempt；開始新測驗必須產生新 key。PR #93 目前會取消同一會員、同一技能的舊進行中 attempt，接入共用 app 時需在整合測試確認此範圍符合最終流程。
+- **完成與 XP：** C 負責 eligibility、抽題、作答及判分；E 的 completion service 維護永久通過狀態與 revision，只有首次通過才 enqueue XP Outbox。已通過技能是否允許重考仍待 C 確認。
+- **歷史：** 沿用 E 的 `GET /api/progress/history`，不另建重複的 C history API。C 首次載入 10 筆，後續使用 `nextCursor`；每頁沿用相同的選填 `skillId` 篩選。
+
 E 的 `getQuizAvailability(database, { userId, skillId })` 和 `GET /api/skills/{skillId}/quiz-availability` 檢查 active skill、會員先修完成和符合單選三選項一個正解、內容完整的正式題數；至少五題才可開始。此服務沒有教材 ready 判斷，因為目前共用 schema 沒有 lesson publication 欄位。C PR #93 的 `tutorials.js` 只有一筆 `draft` 樣本，該 gate 會擋住所有尚未列入靜態清單的技能；C/E 對齊時應改用共用服務，或先決定教材狀態的正式 schema/API 來源。建立測驗的 POST 必須在 transaction 內重做可用性檢查，不能只信任之前的 GET。
 
-C 的讀題 route 不得回傳正解、選項解析或作答正確性。正解只由 E 的 backend-only `listPublishedQuestionsForSkill()` 提供給可信任的 server code。測驗建立和讀題雖在 C PR #93 有實作，答案提交、結果結算、永久通過和 XP 事件的真實端到端流程仍待 C/E/D 對齊；PR #93 的獨立測試不是 E app 的 live DB 整合驗收。
+C 的讀題 route 不得回傳正解或解析；未作答時也不得回傳正確性。讀取已作答題目時可回傳會員自己的 `selectedChoices` 和 `isCorrect`，讓前端呈現本題對錯，但不得回傳正解索引或解析。正解只由 E 的 backend-only `listPublishedQuestionsForSkill()` 提供給可信任的 server code。測驗建立和讀題雖在 C PR #93 有實作，答案提交、結果結算、永久通過和 XP 事件的真實端到端流程仍待 C/E/D 對齊；PR #93 的獨立測試不是 E app 的 live DB 整合驗收。
 
 ### D／C 共用學習歷史 API（E 共用路由已實作，待模組畫面串接）
 
-`GET /api/progress/history?limit=10&skillId=html-basics&cursor=...` 需會員 session，會員 ID 一律取自 session。`skillId` 為選填篩選；C 初次載入 10 筆，後續使用 `nextCursor`。游標綁定原篩選條件，後續請求必須沿用相同 `skillId`。response data 為 `{ items, nextCursor }`；每筆目前包含 `activityId`（等於 `attemptId`）、`activityType: "quiz_attempt"`、`skillId`、`skillTitle`、`catalogVersion`、`completedAt` 及 `result: { correctCount, totalQuestions, passed }`。無紀錄時回空 `items`，不是錯誤。取消的 attempt 不列入歷史。
+`GET /api/progress/history?limit=10&skillId=html-basics&cursor=...` 需會員 session，會員 ID 一律取自 session。`skillId` 為選填篩選；`limit` 可設 1–50，預設 20，C 初次載入 10 筆並將相同 `limit` 帶到後續頁。`cursor` 是不透明 keyset token；回傳的 `nextCursor` 需原樣帶回，且每頁沿用相同 `skillId` 篩選。response data 為 `{ items, nextCursor }`；每筆目前包含 `activityId`（等於 `attemptId`）、`activityType: "quiz_attempt"`、`skillId`、`skillTitle`、`catalogVersion`、`completedAt` 及 `result: { correctCount, totalQuestions, passed }`。無紀錄時回空 `items`，不是錯誤。取消或進行中的 attempt 不列入歷史。
 
 成功回應範例：
 
