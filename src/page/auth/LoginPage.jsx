@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Eye, EyeClosed } from 'iconoir-react';
+import AuthLayout from './components/AuthLayout';
+import AuthLink from './components/AuthLink';
 import './LoginPage.css';
 import { getEmailError, getLoginPasswordError, pickErrors } from '../utils/validators.js';
 import { apiRequest, ApiRequestError } from '../../../../services/api.js';
@@ -24,7 +26,7 @@ function validateField(name, values) {
   }
 }
 
-export default function LoginPage() {
+export default function LoginPage({ loginPath = '/login', registerPath = '/register', LinkComponent } = {}) {
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [formMessage, setFormMessage] = useState('');
@@ -77,7 +79,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="st-login__main">
+    <AuthLayout page="login" loginPath={loginPath} registerPath={registerPath} LinkComponent={LinkComponent}>
+      <main className="st-login__main">
         <form className="st-login__form" noValidate onBlur={handleBlur} onSubmit={handleSubmit} aria-labelledby="login-title">
           <fieldset className="st-login__panel" disabled={submitting}>
             <legend className="st-login__title" id="login-title">登入</legend>
@@ -106,10 +109,11 @@ export default function LoginPage() {
             <button className="st-login__button st-login__submit" type="submit">{submitting ? '登入中…' : '登入'}</button>
             <div className="st-login__links">
               <a href="#" onClick={(event) => event.preventDefault()}>忘記密碼？</a>
-              <a href="#/register">還沒有帳號？註冊</a>
+              <AuthLink to={registerPath} LinkComponent={LinkComponent}>還沒有帳號？註冊</AuthLink>
             </div>
           </fieldset>
         </form>
       </main>
+    </AuthLayout>
   );
 }
