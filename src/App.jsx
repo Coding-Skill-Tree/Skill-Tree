@@ -7,14 +7,17 @@ import Home from "./page/home/Home.jsx";
 import CharacterCreatePage from "./page/member/onboarding/CharacterCreatePage.jsx";
 import ForgotPasswordPage from "./page/member/forget_pwd/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "./page/member/reset_pwd/ResetPasswordPage.jsx";
-import { Routes, Route } from "react-router";
+import AcceptanceLab from "./page/acceptance/AcceptanceLab.jsx";
+import { Routes, Route, useLocation } from "react-router";
 
 function App() {
   // const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const { pathname } = useLocation();
+  const isAcceptancePage = import.meta.env.DEV && pathname.startsWith("/acceptance");
 
   return (
     <div>
-      <Home />
+      {!isAcceptancePage && <Home />}
       <Routes>
         <Route path="/profile" element={<Profile />} />
         <Route path="/onboarding" element={<CharacterCreatePage />} />
@@ -24,6 +27,7 @@ function App() {
         <Route path="/quizs" element={<Quizs />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/admin/*" element={<AdminApp />} />
+        {import.meta.env.DEV && <Route path="/acceptance" element={<AcceptanceLab />} />}
       </Routes>
     </div>
   );

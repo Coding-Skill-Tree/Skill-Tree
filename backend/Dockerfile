@@ -7,6 +7,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY src ./src
+COPY openapi.json ./openapi.json
+COPY docs-ui ./docs-ui
 COPY scripts ./scripts
 COPY migrations ./migrations
 COPY seeds ./seeds

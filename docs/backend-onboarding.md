@@ -131,6 +131,18 @@ C 的測驗路由應在伺服器內呼叫 E 提供的題庫資料服務及 `reco
 
 ## 5. API 路由與共同格式
 
+### 用 API Explorer 試 API
+
+確認 PostgreSQL、API 和前端 Vite 都已啟動後，開啟 http://localhost:5173/api/docs。此頁使用 Skill Tree 自訂的 API Explorer；端點清單、參數及範例直接讀取 OpenAPI，不使用 Swagger UI 預設畫面。同一份機器可讀規格可從 http://localhost:5173/api/openapi.json 取得；規格原始檔為 [backend/openapi.json](../backend/openapi.json)。
+
+1. 點右上角「檢查 API」，確認 HTTP 200 且資料庫為 connected。
+2. 從左側搜尋或分類選端點；右側可填路徑／查詢參數與 JSON 本文，按「送出請求」後查看實際狀態、耗時、headers 和 response body。
+3. 試會員流程時先選 POST /api/auth/login；試後台流程時先選 POST /api/admin/auth/login。成功後瀏覽器會自動保存 HttpOnly cookie，後續呼叫會自動附上，不要手動複製或輸入 cookie。
+4. 從只讀 API 開始，例如 GET /api/me、GET /api/skills、GET /api/admin/members 或 GET /api/admin/questions。驗證 Email 和密碼重設需要本機信箱服務寄來的一次性 token。
+5. POST /api/admin/questions、PUT、DELETE 以及會員停權／恢復會變更資料；請使用自己的本機開發資料庫和測試帳號，不要對共用或正式資料執行。
+
+題庫管理 API 會回傳正解，僅供管理員使用；不要把該回應當成學生作答 API。C 的測驗開始、作答、評分、歷史 API，以及題庫查詢／完成紀錄和 XP Outbox 的 backend-only 服務，尚未納入公開 API Explorer。會員的 `GET /api/progress/history` 已納入 Explorer，讀取已完成測驗的學習歷史投影。各模組採用的共用欄位、身份和資料責任仍以[API 契約](api-contract.md)為準。
+
 | 用途 | 路由 |
 | --- | --- |
 | API 與資料庫健康狀態 | `GET /api/health` |
@@ -140,6 +152,7 @@ C 的測驗路由應在伺服器內呼叫 E 提供的題庫資料服務及 `reco
 | A09 會員列表、搜尋和分頁 | `GET /api/admin/members` |
 | A10 會員詳情與狀態 | `GET /api/admin/members/:id`、`POST /api/admin/members/:id/suspend`、`POST /api/admin/members/:id/restore` |
 | 會員個人資料、onboarding | `GET /api/me`、`PATCH /api/me/profile` |
+| 會員學習歷史 | `GET /api/progress/history` |
 | 忘記密碼與重設密碼 | `POST /api/auth/forgot-password`、`POST /api/auth/reset-password/verify`、`POST /api/auth/reset-password` |
 | 會員學習進度讀取 | `GET /api/progress` |
 
@@ -179,7 +192,7 @@ erDiagram
 
 - A08 與 E 共用管理員登入和 session 的方式需由組內確認。
 - A09/A10 的管理員 API 已提供會員搜尋、詳情、角色、等級、Google 綁定狀態、XP、進度和停權／恢復資料；Google OAuth 尚未串接，等級計算規則仍待確認。
-- C 負責測驗開始、作答、評分和歷史 API；題目服務只在伺服器內呼叫，完成紀錄只在 C 已確認通過後透過 `recordSkillCompletion()` 寫入。正式目錄、題庫內容和端對端服務仍需 B/C 提供並共同驗收。
+- C 負責測驗開始、作答、評分和測驗歷史 API；題目服務、完成紀錄及首通 XP event writer 只在伺服器內呼叫。D 的學習歷史 API route 已提供，先由完成測驗 view 呈現活動；正式目錄、題庫內容和 C/D 畫面串接仍需各組提供並驗收。
 
 ## 常見問題
 
