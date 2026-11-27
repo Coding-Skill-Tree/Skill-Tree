@@ -3,7 +3,7 @@
   "info": {
     "title": "Skill Tree Shared API",
     "version": "1.0.0",
-    "description": "Skill Tree 共用後端 HTTP API。此 OpenAPI 依目前 Express 路由整理；成功回應使用 success/data，錯誤使用 success/error。API Explorer 請從前端同源代理開啟（例如 http://localhost:5173/api/docs），先呼叫登入 API，再於同一個瀏覽器工作階段測試受保護端點。會員 sid 與管理員 admin_sid 為 HttpOnly cookie，無須也不可手動輸入 cookie 值。請只連開發資料庫；題庫新增、修改、刪除與會員停權操作會寫入資料。Email 驗證與密碼重設需要收取信件中的一次性 token。測驗 HTTP API 尚由 C 模組負責，完成紀錄與題庫查詢的內部服務不會暴露成瀏覽器端點。"
+    "description": "Skill Tree 共用後端 HTTP API。此 OpenAPI 依目前 Express 路由整理；成功回應使用 success/data，錯誤使用 success/error。API Explorer 請從前端同源代理開啟（例如 http://localhost:5173/api/docs），先呼叫登入 API，再於同一個瀏覽器工作階段測試受保護端點。會員 sid 與管理員 admin_sid 為 HttpOnly cookie，無須也不可手動輸入 cookie 值。請只連開發資料庫；題庫新增、修改、刪除與會員停權操作會寫入資料。Email 驗證與密碼重設需要收取信件中的一次性 token。測驗 HTTP API 尚由 C 模組負責，完成紀錄與題庫查詢的內部服務不會暴露成瀏覽器端點。 C 的建立測驗與取題 routes 已接入共用 Express；答案提交、結算和測驗歷史 HTTP routes 尚待 C 完成。"
   },
   "servers": [
     {
@@ -35,6 +35,10 @@
     {
       "name": "Question Admin",
       "description": "僅管理員可用的題庫 CRUD；回應包含答案與解析"
+    },
+    {
+      "name": "Quizzes",
+      "description": "會員測驗建立與題目快照讀取；答案與解析不會由本組端點洩漏。"
     }
   ],
   "paths": {
@@ -1325,6 +1329,177 @@
           },
           "401": {
             "$ref": "#/components/responses/MemberUnauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/quizzes/attempts": {
+      "post": {
+        "tags": [
+          "Quizzes"
+        ],
+        "summary": "建立五題測驗",
+        "description": "驗證會員、技能啟用狀態、先修條件和至少五道正式發布題目；在同一資料庫交易保存技能名稱、測驗和題目快照。相同 Idempotency-Key 與本文會重送原 attempt；不同本文回 409。建立新測驗不會刪除舊 attempt。",
+        "operationId": "createQuizAttempt",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每次新的建立操作使用 UUID。遇到逾時或網路錯誤重試時，保留同一個 key；開始另一筆測驗時產生新 key。",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "example": "db3ad4d3-614c-4a12-a01e-896f32086008"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuizAttemptCreateRequest"
+              },
+              "example": {
+                "skillId": "html-basics"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "冪等重送；回傳第一次建立的同一份快照。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizAttemptSuccessResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "建立成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizAttemptSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/MemberUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "404": {
+            "description": "技能不存在或已停用。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "題數不足或此 Idempotency-Key 已用於不同本文。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/quizzes/attempts/{attemptId}": {
+      "parameters": [
+        {
+          "name": "attemptId",
+          "in": "path",
+          "required": true,
+          "description": "測驗 UUID。只允許建立該測驗的會員讀取。",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Quizzes"
+        ],
+        "summary": "讀取測驗題目快照",
+        "description": "回傳作答所需的題目、選項、作答方式和目前選擇。無論答案是否已儲存，這支路由都不回傳正解或選項解析。",
+        "operationId": "getQuizAttempt",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "測驗與題目快照，不含正解和解析。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizAttemptSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/MemberUnauthorized"
+          },
+          "404": {
+            "description": "測驗不存在或不屬於此會員。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "測驗已取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           },
           "503": {
             "$ref": "#/components/responses/DatabaseUnavailable"
@@ -2978,6 +3153,148 @@
                 "type": "boolean"
               }
             }
+          }
+        }
+      },
+      "QuizAttemptCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "skillId"
+        ],
+        "properties": {
+          "skillId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "已啟用的技能 ID；會員需先完成所有先修技能。"
+          }
+        }
+      },
+      "QuizAttemptQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ordinal",
+          "prompt",
+          "choices",
+          "answerMode",
+          "selectedChoices",
+          "answeredAt"
+        ],
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 10,
+            "items": {
+              "type": "string"
+            }
+          },
+          "answerMode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multiple"
+            ]
+          },
+          "selectedChoices": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9
+            },
+            "description": "選項索引從 0 起算；未作答時為空陣列。"
+          },
+          "answeredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "QuizAttempt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId",
+          "skillId",
+          "skillTitle",
+          "catalogVersion",
+          "status",
+          "totalQuestions",
+          "startedAt",
+          "questions"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string"
+          },
+          "skillTitle": {
+            "type": "string",
+            "description": "建立時保存的技能名稱快照。"
+          },
+          "catalogVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_progress",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "totalQuestions": {
+            "type": "integer",
+            "enum": [
+              5
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "questions": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/QuizAttemptQuestion"
+            }
+          }
+        }
+      },
+      "QuizAttemptSuccessResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/QuizAttempt"
           }
         }
       }

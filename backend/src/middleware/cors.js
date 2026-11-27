@@ -1,7 +1,7 @@
 import { runtimeConfig } from '../lib/runtime-config.js';
 
 const ALLOWED_METHODS = 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
-const ALLOWED_HEADERS = 'Content-Type,Authorization,X-Request-Id';
+const ALLOWED_HEADERS = 'Content-Type,Authorization,Idempotency-Key,X-Request-Id';
 
 export function corsAllowlist(request, response, next) {
   const origin = request.get('origin');

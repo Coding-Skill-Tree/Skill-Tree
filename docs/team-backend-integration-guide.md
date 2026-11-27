@@ -11,7 +11,9 @@
 
 ### 1.1 GitHub 與本機目前不相同
 
-截至 2026-11-27 可讀取的遠端狀態，團隊 repo [Coding-Skill-Tree/Skill-Tree](https://github.com/Coding-Skill-Tree/Skill-Tree) 的 `main` 為 `2a65e35`。先前的 [E 管理後台與 API 契約 PR #40](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/40)、[多選題 PR #80](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/80) 和 [C 答案解析 PR #83](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/83) 已合併；P2-E-01～07 [Issues #71–77](https://github.com/Coding-Skill-Tree/Skill-Tree/issues/71) 仍開啟。遠端還有 [B 技能樹 PR #84](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/84)、[PageHeader PR #85](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/85)、[C 測驗建立／取題 PR #86](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/86) 和 [Auth 結構 PR #87](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/87) 尚未合併。A–D 的 P2 工作 [Issues #44–70](https://github.com/Coding-Skill-Tree/Skill-Tree/issues/44) 仍在進行。
+截至 2026-11-27 可讀取的遠端狀態，團隊 repo [Coding-Skill-Tree/Skill-Tree](https://github.com/Coding-Skill-Tree/Skill-Tree) 的 `main` 為 `2a65e35`。先前的 [E 管理後台與 API 契約 PR #40](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/40)、[多選題 PR #80](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/80) 和 [C 答案解析 PR #83](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/83) 已合併；P2-E-01～07 [Issues #71–77](https://github.com/Coding-Skill-Tree/Skill-Tree/issues/71) 仍開啟。遠端還有 [B 技能樹 PR #84](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/84)、[PageHeader PR #85](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/85)、[C 測驗建立／取題 PR #86](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/86) 和 [Auth 結構 PR #87](https://github.com/Coding-Skill-Tree/Skill-Tree/pull/87) 尚未合併。
+
+目前 GitHub 將 #84 標示為不可直接合併；#85、#86、#87 和本 PR #88 標示為可合併。#85 和 #87 都新增 `src/page/shared-components/PageHeader.jsx`，目前兩份內容相同；也都新增 `src/assets/avatar-icon.png`。本 PR 候選沒有修改這兩個路徑。#84 仍與本 PR 在 B demo 的 `src/page/practice/module-b-demo/src/App.jsx` 有衝突，合併前需由 B 與 E 一起處理。以上為查詢當時的 GitHub 狀態，不代表後續合併或 review 結果。A–D 的 P2 工作 [Issues #44–70](https://github.com/Coding-Skill-Tree/Skill-Tree/issues/44) 仍在進行。
 
 PR 候選分支為 `update/e-admin-db-contract`，已整合團隊 `main` 的目前版本，也已提交本分支的程式、文件和圖片。GitHub `main` 尚未包含本文件所述的 E 後端增補。
 
@@ -26,15 +28,16 @@ PR 候選分支為 `update/e-admin-db-contract`，已整合團隊 `main` 的目�
 
 近期遠端進度會影響整合順序：
 
-- PR #86 已新增 `POST /api/quizzes/attempts` 和 `GET /api/quizzes/attempts/:attemptId`，但作答、結算及 XP 消費尚未完成。該 PR 目前仍以 `main` 為基底。
-- PR #86 建立 attempt 時沒有寫入 `skill_title_snapshot`。本分支 migration 010 將該欄位設為 `NOT NULL`，因此兩邊直接合併後，PR #86 的建立測驗 API 會因缺少必填值而失敗；C 也需依 API 契約補上 `Idempotency-Key` 和請求 fingerprint。
-- 本分支和 PR #86 的雙分支合併模擬在 `backend/src/server.js` 有內容衝突；本分支和 PR #84 在 `src/page/practice/module-b-demo/src/App.jsx` 有 modify/delete 衝突。PR #85、#87 與本分支目前的合併模擬沒有檔案衝突。
+- PR #86 仍以 `main` 為基底且尚未合併。本分支已採用並依共用契約改寫其 `POST /api/quizzes/attempts` 和 `GET /api/quizzes/attempts/:attemptId`；答案提交、結算、測驗歷史及 XP 消費仍未完成。
+- 對齊時已補上 `skill_title_snapshot`、`Idempotency-Key` 與 SHA-256 fingerprint，使用 5 題門檻和 2–10 選項的單／多選題庫，移除未共享的靜態教材狀態 gate，並避免重考時刪除舊 attempt。取題與讀取 routes 都不回正解或解析。
+- PR #86 的 `server.js` 是自行建立 Express app；本專案使用 `app.js` app factory 和 `server.js` launcher，因此 routes 已註冊到共用 `app.js`。原始 C branch 的 `server.js` 不應直接覆蓋本分支。本分支和 PR #84 在 `src/page/practice/module-b-demo/src/App.jsx` 仍有 modify/delete 衝突；PR #85、#87 的新增檔案路徑未被本 PR 候選修改，且兩個 PR 的 `PageHeader.jsx` 內容相同。
+- PR #86 和本分支的行為差異、遺留決策及 route 清單列在[測驗 API 整合紀錄](quiz-api-integration.md)。
 
 因此：
 
 1. 若你是從 GitHub `main` clone，請先使用 GitHub 上已合併的功能。PR #85–#87 的內容尚未進入 `main`。
 2. 若要一起驗收本手冊描述的 E 後端，請先切到 PR 顯示的 head SHA，確認所有組員用相同版本。
-3. 合併或標記 PR Ready 前，先和 C 對齊 PR #86 的 schema、建立冪等和 route 註冊方式；也要先解決 PR #84 的衝突，不要假設分支之間可以直接互相合併。
+3. 標記 PR Ready 前，請 C review 已移植的建立／取題 routes 與上述行為差異；另需和 B 解決 PR #84 的前端衝突，不要假設分支可以直接互相合併。
 
 ### 1.2 共同工作狀態表
 
@@ -44,7 +47,7 @@ PR 候選分支為 `update/e-admin-db-contract`，已整合團隊 `main` 的目�
 | --- | --- | --- | --- |
 | A | 登入／註冊畫面 PR #79 已合併；P2-A-01～06 仍開啟。個人資料 PR #81 已關閉但未合併。 | 會員註冊、Email 驗證、登入／登出、session、個人資料及管理員查閱會員 API。 | 依正式 A 畫面逐一接 API，驗證 Email、onboarding、登入保護及失敗提示。 |
 | B | P2-B-01～07 仍開啟。技能樹 PR #84 仍是 Draft，學習歷史互動是模擬資料。 | `GET /api/skills`、`GET /api/progress`、`GET /api/progress/history`。 | 使用 B 的正式 `skillId` 目錄及會員進度；解決本分支和 PR #84 在 `module-b-demo/src/App.jsx` 的 modify/delete 衝突，再驗收畫面。 |
-| C | C 修正 PR #83 已合併；測驗 API PR #86 尚未合併。P2-C-01～07 仍開啟。 | 題庫 backend service、正式題數檢查、`recordSkillCompletion()` 和首次 XP event enqueue。 | PR #86 有建立／取題 routes，尚無作答、結算與 XP 消費；其 `server.js` 與本分支有合併衝突，且建立測驗需配合 migration 010 的必填 `skill_title_snapshot`、Idempotency-Key 與 transaction 契約。 |
+| C | C 修正 PR #83 已合併；PR #86 尚未合併。P2-C-01～07 仍開啟。 | 題庫 backend service、正式題數檢查、`recordSkillCompletion()`、首次 XP event enqueue，以及本分支的測驗建立／取題 routes。 | 答案提交、結算、測驗歷史 HTTP routes 和 XP 消費尚未完成；C 應 review 本分支依 migration 010 與 API 契約改寫的 routes。 |
 | D | 儀表板切版 PR #39 已合併；P2-D-01～07 仍開啟。 | 本機 migration 有 `xp_outbox`、`xp_ledger` 及 lease 欄位；本機有首通 XP event enqueue 服務。 | 尚無 D 的 XP 消費 worker／發獎規則完整實作。D 需定義 claim、lease 確認／失敗、重試、入帳與等級規則，再和 C 做真實流程驗收。 |
 | E | 管理後台 PR #40、題庫多選 PR #80 已合併；P2-E-01～07 仍開啟。 | 本 PR 候選包含 Express、PostgreSQL migrations、登入 session、題庫與會員管理 API、共用回應格式、測試 runner、API Explorer 和學習歷史 API。 | 使用獨立測試 DB；完成 PostgreSQL major version 決策、正式 B 題庫資料及 A/B/C/D 真實串接驗收後，才更新 issue 完成狀態。 |
 
@@ -65,8 +68,8 @@ flowchart LR
   API -->|pg pool| DB[(個人本機 PostgreSQL 17)]
   API --> Skills[技能目錄與會員進度]
   API --> Admin[管理員與題庫 API]
-  C[C 測驗 routes：PR #86 待合併與契約對齊] --> QB[題庫 backend service]
-  C --> Completion[recordSkillCompletion]
+  C[C 測驗建立／取題：本分支已整合] --> QB[題庫 backend service]
+  C -. 作答／結算／歷史待實作 .-> Completion[recordSkillCompletion]
   C -. 首次通過 .-> Outbox[XP Outbox enqueue]
   D[D XP worker：待整合] -. claim／入帳 .-> Outbox
 ```
@@ -339,7 +342,7 @@ API Explorer 和瀏覽器會保留 HttpOnly session cookie。登入成功後再�
 | 會員 session | `POST /api/auth/logout`、`POST /api/auth/change-password`、`GET /api/me`、`PATCH /api/me/profile`、`GET /api/progress`、本機版 `GET /api/progress/history` | 會員本人操作／查詢；以 session cookie 決定身份。 |
 | 管理員登入前／session | `POST /api/admin/auth/login`、`GET /api/admin/me`、`POST /api/admin/auth/logout` | 獨立管理員登入狀態；管理員帳號由 `admin:create` 命令建立。 |
 | 管理員 session | `/api/admin/questions`、`/api/admin/members` | 題庫 CRUD、搜尋與摘要；會員查詢、詳情、停權／恢復。需管理員 session。 |
-| 尚未有公開 route | `/api/quizzes/...` | C 的測驗建立、作答、判分和歷史 API；目前要由 C 在共用 Express 實作。 |
+| 會員 session | `POST /api/quizzes/attempts`、`GET /api/quizzes/attempts/:attemptId` | 建立五題測驗及讀取本人題目快照；不回正解或解析。答案提交、結算與測驗歷史 routes 待實作。 |
 
 ## 11. 組員依模組接線的步驟
 
@@ -363,7 +366,7 @@ API Explorer 和瀏覽器會保留 HttpOnly session cookie。登入成功後再�
 
 ### C：測驗流程、答案判定與首次完成
 
-目前本機後端尚未有公開的 `/api/quizzes/...` routes。C 可以沿用 Express app 新增 routes，並在後端匯入服務：
+本分支已接入建立測驗和題目快照讀取 routes；答案提交、結算和測驗歷史 routes 尚待完成。C 可在共用 Express app 延伸路由，並在後端匯入服務：
 
 ```js
 import { listPublishedQuestionsForSkill } from '../services/question-bank.js';
@@ -373,21 +376,24 @@ import { enqueueSkillFirstPassXpEvent } from '../services/xp-outbox.js';
 
 串接時依序處理：
 
-1. 測驗 route 使用 `requireMember`；會員身份由 session cookie 決定，不接受 client 傳入 `userId`。
-2. 從 `GET /api/skills` 的正式 `skillId` 驗證技能，再呼叫 `listPublishedQuestionsForSkill(database, skillId)`。此服務只取已發布、啟用、未軟刪除、非 demo 的題目，且包含答案索引，**只供可信任的後端判分，絕不能把 `correctChoices` 回傳瀏覽器**。
-3. 建立測驗時快照題目和選項，採用 `Idempotency-Key`，資料表以 `(user_id, idempotency_key)` 保護建立重送。依 API 契約固定每次 5 題。
-4. 儲存答案時用登入 session 限定 attempt 所屬會員；結算時伺服器用快照答案重新判分，不相信前端分數。
-5. 只有 `passed=true` 的完成 attempt 才可在同一 DB transaction 內呼叫 `recordSkillCompletion(database, { userId, skillId, attemptId })`。它會拒絕不屬於該會員／技能或未通過的 attempt；同技能重考不重複新增完成紀錄。
-6. 讀取 `recordSkillCompletion()` 的回傳值；只有 `newlyCompleted === true` 時，才在同一 transaction 呼叫 `enqueueSkillFirstPassXpEvent(database, { userId, skillId, attemptId })`。回滾時 attempt 結果、完成狀態、revision 和 XP event 要一起回滾。
+1. 測驗 routes 使用 `requireMember`；會員身份由 session cookie 決定，不接受 client 傳入 `userId`。
+2. `POST /api/quizzes/attempts` 驗證 active skill、先修條件及題庫最低題數，再由 `listPublishedQuestionsForSkill(database, skillId)` 取已發布、啟用、未軟刪除、非 demo 題。此服務包含答案索引，**只供可信任的後端判分，絕不能把 `correctChoices` 回傳瀏覽器**。
+3. 建立測驗會快照題目、選項、技能名稱和答案，採用 `Idempotency-Key`，資料表以 `(user_id, idempotency_key)` 保護建立重送。依目前 API 契約抽 5 題；新 attempt 不刪除先前未完成 attempt。
+4. `GET /api/quizzes/attempts/:attemptId` 只允許同一會員讀取；即使 attempt 還在進行中，也不會回正解或解析欄位。
+5. 待實作的答案 routes 應用登入 session 限定 attempt 所屬會員；結算時伺服器用快照答案重新判分，不相信前端分數。
+6. 只有 `passed=true` 的完成 attempt 才可在同一 DB transaction 內呼叫 `recordSkillCompletion(database, { userId, skillId, attemptId })`。它會拒絕不屬於該會員／技能或未通過的 attempt；同技能重考不重複新增完成紀錄。
+7. 讀取 `recordSkillCompletion()` 的回傳值；只有 `newlyCompleted === true` 時，才在同一 transaction 呼叫 `enqueueSkillFirstPassXpEvent(database, { userId, skillId, attemptId })`。回滾時 attempt 結果、完成狀態、revision 和 XP event 要一起回滾。
    ```js
    const completion = await recordSkillCompletion(client, { userId, skillId, attemptId });
    if (completion.newlyCompleted) {
      await enqueueSkillFirstPassXpEvent(client, { userId, skillId, attemptId });
    }
    ```
-7. 用 `GET /api/progress` 和 `GET /api/progress/history` 驗證 B、D 所讀到的結果；確認連續重送不會重複計分、完成紀錄或 XP event。
+8. 用 `GET /api/progress` 和 `GET /api/progress/history` 驗證 B、D 所讀到的結果；確認連續重送不會重複計分、完成紀錄或 XP event。
 
-完成測驗建立／作答／結算／歷史 endpoints 前，C 的前端畫面只能用清楚標示的 mock 資料；不可將管理員題庫 API 當成會員測驗 API。
+建立或擴充 route 時，請在 `backend/src/app.js` 註冊共用 router；`backend/src/server.js` 只負責啟動既有 app，不要另建第二個 Express instance。
+
+目前建立／取題 endpoints 可由 C 前端使用；答案提交／結算／歷史 endpoints 尚待完成。尚未接上的畫面需明確標示 mock 資料；不可將管理員題庫 API 當成會員測驗 API。
 
 ### D：XP、等級、成就和儀表板
 

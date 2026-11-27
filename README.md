@@ -40,9 +40,13 @@ Vite 將 `/api` 代理至 `http://127.0.0.1:3000`。前端和後端需同時執�
 
 新組員的逐步資料庫設定、API 測試和模組整合流程請看[後端與資料庫上手指南](docs/backend-onboarding.md)。
 
+文件總覽和第一次使用的簡明步驟在[文件索引](docs/README.md)與[組員快速開始指南](docs/quick-start-for-teammates.md)。
+
 GitHub 進度、本機未推送版本狀態，以及 A–E 組員的串接和驗收步驟請看[團隊後端整合與驗收手冊](docs/team-backend-integration-guide.md)。
 
 本機開發時可由導覽列開啟「驗收實驗室」，或直接前往 `/acceptance`。頁面逐步呼叫本機 API，顯示 HTTP 狀態、回應格式及驗收結果；資料庫整合測試紀錄和 B/C/D 尚待接入的項目也會分開標示。此頁只在 Vite 開發模式提供，不會打包進 production。完整後端測試請使用獨立 `TEST_DATABASE_URL` 後執行 `npm run test:api`。
+
+另有 `/workbench` 前後端開發工作台，可由資料流圖跳到白名單程式碼、查看 API 和 migration 狀態。此工具只在 Vite 開發模式出現；預設只讀取 API 健康、OpenAPI、migration 中繼資料及指定程式檔，不會顯示會員資料、密碼或環境變數。
 
 A–E 共用的正式路由、欄位名稱、回應格式、認證方式及資料責任請看[API 契約 v1](docs/api-contract.md)。各模組實作 API 前先依這份契約對齊。
 
@@ -71,6 +75,7 @@ A–E 共用的正式路由、欄位名稱、回應格式、認證方式及資�
 - `/api/admin/members`、`/api/admin/members/:id`：A09 會員搜尋與分頁、A10 會員詳情；詳情提供角色、Google 綁定、XP、等級、學習進度及停權／恢復操作。
 - `GET /api/skills`：公開唯讀技能目錄，提供分類、技能節點、學習項目、位置、先修關係與 `catalogVersion`。
 - `GET /api/progress`：登入會員讀取 `catalogVersion`、`revision`、`completedSkillIds`。C 後端在 transaction 中呼叫 E 的 completion service 寫入通過的技能；沒有瀏覽器可傳入 `userId` 的通用寫入端點。
+- `POST /api/quizzes/attempts`、`GET /api/quizzes/attempts/:attemptId`：會員建立五題測驗及讀取自己的題目快照；建立需 UUID `Idempotency-Key`。答案提交、結算和測驗歷史 routes 尚待完成。
 
 成功回應使用 `{ "success": true, "data": ... }`，錯誤使用 `{ "success": false, "error": { "code", "message", "requestId", "fields?" } }`。BIGINT ID 以字串傳送，時間使用 UTC ISO 8601。管理員會員 API 對齊 A 組第一階段假 API 欄位；角色和等級存於會員資料，等級公式仍待小組確認；Google 綁定資料由 `member_auth_identities` 保存，但 OAuth 串接尚未實作。XP 與分類進度分別讀取帳本和完成紀錄。前端共用 API client 在 `src/services/api.js`；管理員登入和題庫 adapter 分別在 `src/services/adminAuth.js`、`src/services/adminQuestions.js`。
 
@@ -112,6 +117,6 @@ A–E 共用的正式路由、欄位名稱、回應格式、認證方式及資�
 
 資料庫進度表使用 `user_skill_completions`，migration 006 將舊 scaffold 表名 `completed_skills` 遷移至共用名稱；migration 007 增加會員角色、等級與 Google 綁定資料。等級計算規則和 Google OAuth 流程仍待小組確認，既有 migration 保持不變。
 
-C 在共用 Express 中負責測驗開始／作答／評分／歷史 routes，並呼叫僅供 backend 使用的 E 題庫 repository；不得把管理員題庫 API 或正解欄位提供給瀏覽器。每個 active skill 至少需 5 道正式已發布題目；`npm run db:question-coverage` 可檢查題數，展示 seed 不算正式題目。
+C 在共用 Express 中負責測驗開始／作答／評分／歷史流程，並呼叫僅供 backend 使用的 E 題庫 repository；建立和取題 routes 已接入，答案提交、結算和測驗歷史 routes 尚待完成。不得把管理員題庫 API 或正解欄位提供給瀏覽器。每個 active skill 至少需 5 道正式已發布題目；`npm run db:question-coverage` 可檢查題數，展示 seed 不算正式題目。原 PR #86 提出的 8 道題庫門檻與現行契約不同，需由 B/C/E review 後再調整。
 
 後端整合測試使用獨立 PostgreSQL test database，設定 `TEST_DATABASE_URL` 後執行 `npm run test:api`。runner 只接受名稱包含 `test` 的資料庫，會拒絕與 `DATABASE_URL` 指到相同資料庫，並且不會 drop 資料庫。正式部署、production SMTP 和共用資料庫仍需由團隊另外驗收。

@@ -2,7 +2,7 @@
 
 這份文件是 A、B、C、D、E 共用的 API 對齊基準。路由以目前 Express 後端為準；沒有標示「已實作」的端點不得由前端假設存在。
 
-互動式 API Explorer：啟動本機前端及 API 後開啟 [API Explorer](http://localhost:5173/api/docs)；機器可讀的 OpenAPI 3.0 定義在 [backend/openapi.json](../backend/openapi.json)，非 production 環境提供 `/api/openapi.json`。Explorer 直接讀取 OpenAPI，不另維護第二份路由清單；production 不提供 Explorer 或 OpenAPI HTTP 路由。OpenAPI 僅列出目前已存在的 HTTP 路由；C 的測驗端點和內部題庫／完成服務尚未做成公開 HTTP API。題庫寫入與會員停權操作會修改資料，請只連本機測試資料庫。
+互動式 API Explorer：啟動本機前端及 API 後開啟 [API Explorer](http://localhost:5173/api/docs)；機器可讀的 OpenAPI 3.0 定義在 [backend/openapi.json](../backend/openapi.json)，非 production 環境提供 `/api/openapi.json`。Explorer 直接讀取 OpenAPI，不另維護第二份路由清單；production 不提供 Explorer 或 OpenAPI HTTP 路由。目前已實作測驗建立與題目快照讀取；答案提交、結算與測驗歷史 HTTP routes 仍待 C 完成。題庫寫入和會員停權等 Explorer 操作會修改資料，請只連本機測試資料庫。
 
 ## 共通規則
 
@@ -159,21 +159,23 @@ B×C 在 [整合討論 #1](https://github.com/Coding-Skill-Tree/Skill-Tree/issue
 
 正式題庫覆蓋率以每個啟用技能至少 5 道符合上述條件的題目為驗收門檻。`npm run db:question-coverage` 檢查覆蓋率；目前開發 seed 是展示題，不計入正式覆蓋率。正式題目內容由 B/C 確認後提供。
 
-### C 測驗 API 與資料規則（E 後端契約草案，待 C route 對接）
+### C 測驗 API 與資料規則
 
-以下路由和資料責任供 C、B、D 對接；目前不列入 API Explorer，直到共用 Express routes 實際完成。
+建立測驗及取題 routes 已接入共用 Express、API Explorer 和前端 API adapter。答案提交、結算和測驗歷史仍是後續工作；下表中標示「待實作」的 endpoints 不可假設已存在。
 
 | Method | Path | 認證 | 用途 |
 | --- | --- | --- | --- |
-| POST | `/api/quizzes/attempts` | 會員 | 建立五題 attempt；request body 使用 `{ skillId }`，並必帶 UUID `Idempotency-Key` header |
-| GET | `/api/quizzes/attempts/:attemptId` | 同一會員 | 讀取 attempt 及題目；不含正解欄位 |
-| POST | `/api/quizzes/attempts/:attemptId/answers` | 同一會員 | 儲存一題答案；使用 `{ ordinal, selectedChoices }`，選項索引從 0 起算 |
-| GET | `/api/quizzes/attempts/:attemptId/result` | 同一會員 | 讀取已保存結算結果 |
-| GET | `/api/quizzes/history` | 會員 | 查自己的所有已完成測驗，支援 keyset pagination |
+| POST | `/api/quizzes/attempts` | 會員 | **已實作**；建立五題 attempt；body `{ skillId }`；必帶 UUID `Idempotency-Key` header |
+| GET | `/api/quizzes/attempts/:attemptId` | 同一會員 | **已實作**；讀取 attempt 及題目快照，不含正解／解析欄位 |
+| POST | `/api/quizzes/attempts/:attemptId/answers` | 同一會員 | **待實作**；儲存一題答案；使用 `{ ordinal, selectedChoices }`，選項索引從 0 起算 |
+| GET | `/api/quizzes/attempts/:attemptId/result` | 同一會員 | **待實作**；讀取已保存結算結果 |
+| GET | `/api/quizzes/history` | 會員 | **待實作**；查自己的所有已完成測驗，支援 keyset pagination |
 
-建立 attempt 時，後端取 active skill/catalog version、抽題並快照題目、選項及正解。題目查詢回應只送 prompt、choices、answerMode 和 ordinal；答案只能由伺服器用快照判定。只有相同 session 會員可查看、作答和讀取自己的 attempt。
+建立 attempt 時，後端檢查會員、active skill、先修條件和至少 5 道符合正式題庫規則的題目，再抽出 5 題並在同一 transaction 保存技能名稱、題目、選項、作答方式和答案快照。新 attempt 回 HTTP 201；建立重送回 HTTP 200。建立新測驗不會刪除會員先前尚未完成的測驗。只有擁有該測驗的 session 會員可讀取。
 
-Idempotency-Key 以 `(session userId, key)` 唯一。fingerprint 對 canonical request JSON 的 UTF-8 bytes 做 SHA-256；相同 key、相同本文重送回相同 attempt 和原題目快照，相同 key 但不同本文回 `409 IDEMPOTENCY_KEY_REUSED`。題目快照和 attempt 必須在同一 transaction 建立，key 不設過期，避免延遲重送建立第二次測驗。
+目前 `GET /api/quizzes/attempts/:attemptId` 只回 prompt、choices、answerMode、ordinal、已保存的 selectedChoices／answeredAt；即使某題已作答但 attempt 仍在進行，也不回 `correctChoices`、`choiceExplanations`、`explanation` 或正確性布林值。結果資訊應由未來的 result endpoint 在完成後提供。
+
+Idempotency-Key 以 `(session userId, key)` 唯一。fingerprint 對 `{ skillId }` 的 canonical JSON UTF-8 bytes 做 SHA-256；相同 key、相同本文重送回相同 attempt 和原題目快照，相同 key 但不同本文回 `409 IDEMPOTENCY_KEY_REUSED`。題目快照和 attempt 必須在同一 transaction 建立，key 不設過期，避免延遲重送建立第二次測驗。前端逾時重試應保存並沿用同一個 key；開始新的 attempt 才產生新 key。
 
 答案由 `(attemptId, ordinal)` 唯一定位；完全相同的重送不新增列。測驗仍在進行時可更改答案，該列只保存最新選取；attempt 結算後不可改答案。最後一題答案寫入後，若五題都已有答案，後端在同一 transaction 鎖定 attempt、由快照重算五題成績，僅允許一次從 `in_progress` 轉為 `completed`；再送相同答案回既有結果，不同答案或更新已完成 attempt 回 `409 ATTEMPT_ALREADY_COMPLETED`。重送結算不得再建立完成、revision 或 XP 紀錄。
 

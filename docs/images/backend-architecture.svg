@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 820" role="img" aria-labelledby="title description">
   <title id="title">Skill Tree 共用後端與跨模組整合狀態</title>
-  <desc id="description">A、B 模組使用共用 Express API；C 的建立與取題 routes 在 PR 86，待合併和契約對齊，作答與結算尚待接入；D XP worker 尚待接入。Express 連到 PostgreSQL migrations 001 到 010。</desc>
+  <desc id="description">A、B 模組使用共用 Express API；C 的測驗建立與取題 routes 已接入共用 app，答案提交、結算尚待接入；D XP worker 尚待接入。Express 連到 PostgreSQL migrations 001 到 010。</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
       <path d="M0 0L10 5L0 10Z" fill="#52756A" />
@@ -42,10 +42,10 @@
   <text x="80" y="375" class="card-copy">目錄、會員進度、學習歷史 API 已提供</text>
   <text x="80" y="398" class="small">B 畫面串接與正式目錄資料仍待驗收</text>
 
-  <rect x="56" y="440" width="400" height="106" rx="16" class="pending" />
+  <rect x="56" y="440" width="400" height="106" rx="16" class="api" />
   <text x="80" y="476" class="card-title">C · 測驗流程</text>
-  <text x="80" y="505" class="card-copy">建立／取題 routes 在 PR #86；作答與結算待接入</text>
-  <text x="80" y="528" class="small">合併前須對齊 migration 010 與冪等契約</text>
+  <text x="80" y="505" class="card-copy">建立／取題 routes 已接共用 API</text>
+  <text x="80" y="528" class="small">作答、結算與測驗歷史 routes 待完成</text>
 
   <rect x="56" y="570" width="400" height="106" rx="16" class="pending" />
   <text x="80" y="606" class="card-title">D · XP 與遊戲化</text>
@@ -59,15 +59,15 @@
   <line x1="552" y1="305" x2="988" y2="305" stroke="#c6ddd0" stroke-width="2" />
   <text x="552" y="340" class="section">已提供的 HTTP API</text>
   <text x="552" y="373" class="card-copy">/api/auth/* · /api/me · /api/admin/*</text>
-  <text x="552" y="401" class="card-copy">GET /api/skills · GET /api/progress</text>
-  <text x="552" y="429" class="card-copy">GET /api/progress/history</text>
+  <text x="552" y="401" class="card-copy">GET /api/skills · GET /api/progress/history</text>
+  <text x="552" y="429" class="card-copy">POST /api/quizzes/attempts · GET attempt</text>
   <line x1="552" y1="454" x2="988" y2="454" stroke="#c6ddd0" stroke-width="2" />
   <text x="552" y="490" class="section">Backend-only services</text>
   <text x="552" y="523" class="card-copy">正式題庫查詢 · recordSkillCompletion()</text>
   <text x="552" y="551" class="card-copy">enqueueSkillFirstPassXpEvent()</text>
   <rect x="552" y="578" width="436" height="66" rx="12" fill="#ffffff" stroke="#d7e5dd" />
-  <text x="572" y="606" class="small">API Explorer 僅在非 production 環境提供</text>
-  <text x="572" y="628" class="small">測試範圍不等於 B/C/D 端對端完成</text>
+  <text x="572" y="606" class="small">API Explorer 和唯讀工作台僅在開發環境提供</text>
+  <text x="572" y="628" class="small">建題／取題已接；仍待 B/C/D 端對端驗收</text>
 
   <rect x="1080" y="180" width="304" height="496" rx="20" class="database" />
   <text x="1112" y="222" class="card-title">PostgreSQL</text>
@@ -87,7 +87,7 @@
 
   <path d="M456 232H520" class="implemented-line" />
   <path d="M456 362H520" class="implemented-line" />
-  <path d="M456 492H520" class="pending-line" />
+  <path d="M456 492H520" class="implemented-line" />
   <path d="M456 622H520" class="pending-line" />
   <path d="M1020 428H1080" class="implemented-line" />
   <path d="M1020 610H1080" class="pending-line" />

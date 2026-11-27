@@ -10,12 +10,14 @@ import CharacterCreatePage from "./page/member/onboarding/CharacterCreatePage.js
 import ForgotPasswordPage from "./page/member/forget_pwd/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "./page/member/reset_pwd/ResetPasswordPage.jsx";
 import AcceptanceLab from "./page/acceptance/AcceptanceLab.jsx";
+import DevWorkbench from "./page/dev-workbench/DevWorkbench.jsx";
 import { Routes, Route, useLocation } from "react-router";
 
 function App() {
   // const path = window.location.pathname.replace(/\/+$/, "") || "/";
   const { pathname } = useLocation();
-  const isAcceptancePage = import.meta.env.DEV && pathname.startsWith("/acceptance");
+  const isAcceptancePage = import.meta.env.DEV
+    && (pathname.startsWith("/acceptance") || pathname === "/workbench");
 
   return (
     <div>
@@ -32,6 +34,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         {import.meta.env.DEV && <Route path="/acceptance" element={<AcceptanceLab />} />}
+        {import.meta.env.DEV && <Route path="/workbench" element={<DevWorkbench />} />}
       </Routes>
     </div>
   );

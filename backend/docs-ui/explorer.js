@@ -144,6 +144,10 @@ function queryParameters(item) {
   return item.parameters.filter((parameter) => parameter.in === 'query');
 }
 
+function headerParameters(item) {
+  return item.parameters.filter((parameter) => parameter.in === 'header');
+}
+
 function fieldType(parameter) {
   const schema = dereference(parameter.schema);
   if (schema.enum?.length) return 'text';
@@ -179,12 +183,14 @@ function renderSchemaRows(schema, required = [], depth = 0) {
 function renderRequestDocs(item) {
   const pathFields = pathParameters(item);
   const queryFields = queryParameters(item);
+  const headerFields = headerParameters(item);
   const body = dereference(item.operation.requestBody);
   const hasBody = Boolean(item.operation.requestBody);
   const media = jsonMedia(body.content);
   const example = hasBody ? getBodyExample(item.operation) : null;
   return `<div class="field-section"><h4 class="field-section-title">路徑參數</h4>${renderParameterRows(pathFields)}</div>
     <div class="field-section"><h4 class="field-section-title">查詢參數</h4>${renderParameterRows(queryFields)}</div>
+    ${headerFields.length ? `<div class="field-section"><h4 class="field-section-title">Request headers</h4>${renderParameterRows(headerFields)}</div>` : ''}
     ${hasBody ? `<div class="field-section"><h4 class="field-section-title">Request body <span class="field-hint">${body.required ? '必填' : '選填'} · ${escapeHtml(Object.keys(body.content || {}).join(', ') || 'application/json')}</span></h4>
       ${renderSchemaRows(media.schema)}<details class="example-block"><summary>查看 JSON 範例</summary><pre class="request-example">${escapeHtml(JSON.stringify(example, null, 2))}</pre></details></div>` : ''}`;
 }
@@ -214,6 +220,7 @@ function renderInputField(item, parameter) {
 function renderExecutionFields(item) {
   const pathFields = pathParameters(item);
   const queryFields = queryParameters(item);
+  const headerFields = headerParameters(item);
   const body = dereference(item.operation.requestBody);
   const hasBody = Boolean(item.operation.requestBody);
   const example = hasBody ? JSON.stringify(getBodyExample(item.operation), null, 2) : '';
@@ -221,9 +228,10 @@ function renderExecutionFields(item) {
   return `<div class="panel-content">
     ${pathFields.length ? `<div class="field-section"><h4 class="field-section-title">路徑參數</h4>${pathFields.map((parameter) => renderInputField(item, parameter)).join('')}</div>` : ''}
     ${queryFields.length ? `<div class="field-section"><h4 class="field-section-title">查詢參數</h4>${queryFields.map((parameter) => renderInputField(item, parameter)).join('')}</div>` : ''}
+    ${headerFields.length ? `<div class="field-section"><h4 class="field-section-title">Request headers</h4>${headerFields.map((parameter) => renderInputField(item, parameter)).join('')}</div>` : ''}
     ${hasBody ? `<div class="field-section"><h4 class="field-section-title">Request body <span class="field-hint">${body.required ? '必填' : '選填'} · JSON</span></h4>
       <textarea class="json-editor" data-body-input="${escapeHtml(item.id)}" spellcheck="false" aria-label="JSON request body">${escapeHtml(bodyValue)}</textarea></div>` : ''}
-    ${!pathFields.length && !queryFields.length && !hasBody ? '<p class="no-fields">此端點不需要輸入參數。</p>' : ''}
+    ${!pathFields.length && !queryFields.length && !headerFields.length && !hasBody ? '<p class="no-fields">此端點不需要輸入參數。</p>' : ''}
     <p class="write-warning">僅對本機開發 API 發送。新增、修改、刪除或登入請求會依端點實際寫入資料／建立 Session。</p>
     <div class="execute-row"><button class="execute-button" type="button" data-execute="${escapeHtml(item.id)}" ${runningOperationId === item.id ? 'disabled' : ''}>${runningOperationId === item.id ? '執行中…' : 'Execute'} <span aria-hidden="true">→</span></button><span class="run-state">Cookie 會由同源瀏覽器自動帶入</span></div>
   </div>`;
@@ -422,6 +430,11 @@ function buildRequest(item) {
     else if (parameter.required) throw new Error(`請填寫查詢參數：${parameter.name}`);
   });
   const options = { method: item.method, credentials: 'include', headers: { Accept: 'application/json' } };
+  headerParameters(item).forEach((parameter) => {
+    const value = values[`header:${parameter.name}`];
+    if (value !== undefined && String(value).trim()) options.headers[parameter.name] = String(value).trim();
+    else if (parameter.required) throw new Error(`請填寫 request header：${parameter.name}`);
+  });
   if (item.operation.requestBody) {
     const rawBody = values.body ?? JSON.stringify(getBodyExample(item.operation), null, 2);
     if (!rawBody.trim()) {

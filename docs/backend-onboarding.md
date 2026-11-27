@@ -141,7 +141,9 @@ C 的測驗路由應在伺服器內呼叫 E 提供的題庫資料服務及 `reco
 4. 從只讀 API 開始，例如 GET /api/me、GET /api/skills、GET /api/admin/members 或 GET /api/admin/questions。驗證 Email 和密碼重設需要本機信箱服務寄來的一次性 token。
 5. POST /api/admin/questions、PUT、DELETE 以及會員停權／恢復會變更資料；請使用自己的本機開發資料庫和測試帳號，不要對共用或正式資料執行。
 
-題庫管理 API 會回傳正解，僅供管理員使用；不要把該回應當成學生作答 API。C 的測驗開始、作答、評分、歷史 API，以及題庫查詢／完成紀錄和 XP Outbox 的 backend-only 服務，尚未納入公開 API Explorer。會員的 `GET /api/progress/history` 已納入 Explorer，讀取已完成測驗的學習歷史投影。各模組採用的共用欄位、身份和資料責任仍以[API 契約](api-contract.md)為準。
+題庫管理 API 會回傳正解，僅供管理員使用；不要把該回應當成學生作答 API。C 的 `POST /api/quizzes/attempts` 和 `GET /api/quizzes/attempts/:attemptId` 已接到共用 Express 和 API Explorer；答案提交、結算及測驗歷史 routes 仍待 C 完成。題庫查詢、完成紀錄和 XP Outbox 服務是 backend-only，不會開成通用瀏覽器端點。會員的 `GET /api/progress/history` 已納入 Explorer，讀取已完成測驗的學習歷史投影。各模組採用的共用欄位、身份和資料責任仍以[API 契約](api-contract.md)為準。
+
+本機還提供只讀的[前後端開發工作台](http://localhost:5173/workbench)：它會顯示 API/資料庫健康狀態、OpenAPI 端點、migration 套用清單，以及固定白名單內的程式碼。若要實際呼叫 API，使用 `/api/docs`；工作台不會建立或修改資料。
 
 | 用途 | 路由 |
 | --- | --- |

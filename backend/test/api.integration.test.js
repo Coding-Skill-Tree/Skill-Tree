@@ -71,8 +71,8 @@ function cookieFrom(response, name) {
   return header.split(';', 1)[0];
 }
 
-async function api(path, { method = 'GET', body, cookie, origin } = {}) {
-  const headers = new Headers();
+async function api(path, { method = 'GET', body, cookie, origin, headers: extraHeaders } = {}) {
+  const headers = new Headers(extraHeaders);
   if (body !== undefined) headers.set('Content-Type', 'application/json');
   if (cookie) headers.set('Cookie', cookie);
   if (origin) headers.set('Origin', origin);
@@ -156,6 +156,8 @@ test('Skill Tree API integration contract', async (t) => {
     assert.equal(openApi.status, 200);
     const spec = await openApi.json();
     assert.ok(spec.paths['/api/progress/history']);
+    assert.ok(spec.paths['/api/quizzes/attempts'].post.parameters.some((parameter) => parameter.name === 'Idempotency-Key'));
+    assert.ok(spec.paths['/api/quizzes/attempts/{attemptId}'].get);
     const explorer = await api('/api/docs/');
     assert.equal(explorer.status, 200);
     assert.match(await explorer.text(), /Skill Tree API Explorer/u);
@@ -167,12 +169,30 @@ test('Skill Tree API integration contract', async (t) => {
       data: { status: 'ok', database: 'connected' },
     });
 
+    const workbenchStatus = await api('/api/dev/workbench/status');
+    assert.equal(workbenchStatus.status, 200);
+    const statusData = (await workbenchStatus.json()).data;
+    assert.ok(statusData.migrations.some((migration) => migration.name === '010_learning_history_and_idempotency.sql'));
+    const workbenchSource = await api('/api/dev/workbench/sources/backend-app');
+    assert.equal(workbenchSource.status, 200);
+    const sourceData = (await workbenchSource.json()).data;
+    assert.equal(sourceData.path, 'backend/src/app.js');
+    assert.match(sourceData.content, /quizzesRouter/u);
+    const unknownSource = await api('/api/dev/workbench/sources/../../.env');
+    assert.equal(unknownSource.status, 404);
+
     const preflight = await api('/api/admin/questions/1', {
       method: 'OPTIONS',
       origin: appOrigin,
     });
     assert.equal(preflight.status, 204);
     assert.match(preflight.headers.get('access-control-allow-methods'), /\bPUT\b/u);
+    const quizPreflight = await api('/api/quizzes/attempts', {
+      method: 'OPTIONS',
+      origin: appOrigin,
+    });
+    assert.equal(quizPreflight.status, 204);
+    assert.match(quizPreflight.headers.get('access-control-allow-headers'), /\bIdempotency-Key\b/u);
 
     const originalQuery = pool.query;
     pool.query = async () => { throw new Error('simulated database outage'); };
@@ -484,6 +504,119 @@ test('Skill Tree API integration contract', async (t) => {
       ),
       (error) => error.code === '23514',
     );
+  });
+
+  await t.test('quiz create and read routes follow idempotency, snapshots and answer secrecy contract', async () => {
+    await pool.query(
+      `UPDATE questions
+       SET answer_mode = 'multiple', correct_choices = '[0,1]'::jsonb
+       WHERE id = (
+         SELECT id FROM questions
+         WHERE skill_id = $1 AND active = true AND status = 'published' AND is_demo = false
+         ORDER BY id LIMIT 1
+       )`,
+      [fixtures.skillId],
+    );
+
+    const idempotencyKey = randomUUID();
+    const createRequest = () => api('/api/quizzes/attempts', {
+      method: 'POST',
+      cookie: memberCookie,
+      origin: appOrigin,
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: { skillId: fixtures.skillId },
+    });
+    const [first, concurrentRetry] = await Promise.all([createRequest(), createRequest()]);
+    assert.deepEqual([first.status, concurrentRetry.status].sort(), [200, 201]);
+    const firstData = (await first.json()).data;
+    const retryData = (await concurrentRetry.json()).data;
+    assert.equal(firstData.attemptId, retryData.attemptId);
+    assert.deepEqual(firstData, retryData);
+    assert.equal(firstData.skillId, fixtures.skillId);
+    assert.equal(firstData.skillTitle, `Integration ${tag}`);
+    assert.equal(firstData.totalQuestions, 5);
+    assert.deepEqual(firstData.questions.map((question) => question.ordinal), [1, 2, 3, 4, 5]);
+    assert.ok(firstData.questions.some((question) => question.answerMode === 'multiple'));
+    assert.ok(firstData.questions.every((question) => question.selectedChoices.length === 0));
+    assert.doesNotMatch(JSON.stringify(firstData), /correctChoice|choiceExplanations|"explanation"|isCorrect/u);
+
+    const storedAttempt = await pool.query(
+      `SELECT skill_title_snapshot AS "skillTitle", idempotency_key::text AS "idempotencyKey",
+              octet_length(idempotency_fingerprint)::int AS "fingerprintBytes"
+       FROM quiz_attempts WHERE id = $1`,
+      [firstData.attemptId],
+    );
+    assert.equal(storedAttempt.rows[0].skillTitle, `Integration ${tag}`);
+    assert.equal(storedAttempt.rows[0].idempotencyKey, idempotencyKey);
+    assert.equal(storedAttempt.rows[0].fingerprintBytes, 32);
+
+    const reusedKey = await api('/api/quizzes/attempts', {
+      method: 'POST', cookie: memberCookie, origin: appOrigin,
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: { skillId: `${fixtures.skillId}-different` },
+    });
+    assert.equal(reusedKey.status, 409);
+    assert.equal((await reusedKey.json()).error.code, 'IDEMPOTENCY_KEY_REUSED');
+
+    const missingKey = await api('/api/quizzes/attempts', {
+      method: 'POST', cookie: memberCookie, origin: appOrigin,
+      body: { skillId: fixtures.skillId },
+    });
+    assert.equal(missingKey.status, 400);
+    assert.equal((await missingKey.json()).error.code, 'VALIDATION_ERROR');
+
+    await pool.query(
+      `UPDATE quiz_attempt_questions
+       SET selected_choice = 0, selected_choices = '[0]'::jsonb, answered_at = now()
+       WHERE attempt_id = $1 AND ordinal = 1`,
+      [firstData.attemptId],
+    );
+    const fetched = await api(`/api/quizzes/attempts/${firstData.attemptId}`, { cookie: memberCookie });
+    assert.equal(fetched.status, 200);
+    const fetchedData = (await fetched.json()).data;
+    assert.equal(fetchedData.skillTitle, `Integration ${tag}`);
+    assert.deepEqual(fetchedData.questions[0].selectedChoices, [0]);
+    assert.ok(fetchedData.questions[0].answeredAt);
+    assert.doesNotMatch(JSON.stringify(fetchedData), /correctChoice|choiceExplanations|"explanation"|isCorrect/u);
+
+    const foreignRead = await api(`/api/quizzes/attempts/${firstData.attemptId}`, { cookie: cookieFrom(
+      await api('/api/auth/login', {
+        method: 'POST', origin: appOrigin,
+        body: { email: otherMember.email, password },
+      }),
+      'sid',
+    ) });
+    assert.equal(foreignRead.status, 404);
+    assert.equal((await api(`/api/quizzes/attempts/${firstData.attemptId}`)).status, 401);
+
+    const freshKey = randomUUID();
+    const freshAttempt = await api('/api/quizzes/attempts', {
+      method: 'POST', cookie: memberCookie, origin: appOrigin,
+      headers: { 'Idempotency-Key': freshKey },
+      body: { skillId: fixtures.skillId },
+    });
+    assert.equal(freshAttempt.status, 201);
+    const freshData = (await freshAttempt.json()).data;
+    assert.notEqual(freshData.attemptId, firstData.attemptId);
+    const previousAttemptStillExists = await api(`/api/quizzes/attempts/${firstData.attemptId}`, { cookie: memberCookie });
+    assert.equal(previousAttemptStillExists.status, 200);
+
+    await pool.query(
+      `UPDATE questions SET status = 'draft', active = false
+       WHERE id = (
+         SELECT id FROM questions
+         WHERE skill_id = $1 AND active = true AND status = 'published' AND is_demo = false
+         ORDER BY id LIMIT 1
+       )`,
+      [fixtures.skillId],
+    );
+    const belowMinimum = await api('/api/quizzes/attempts', {
+      method: 'POST', cookie: memberCookie, origin: appOrigin,
+      headers: { 'Idempotency-Key': randomUUID() },
+      body: { skillId: fixtures.skillId },
+    });
+    assert.equal(belowMinimum.status, 409);
+    assert.equal((await belowMinimum.json()).error.code, 'INSUFFICIENT_QUESTIONS');
   });
 
   await t.test('admin member actions use admin session and suspend invalidates member session', async () => {

@@ -12,6 +12,8 @@ import { adminRouter } from './routes/admin.js';
 import { adminQuestionsRouter } from './routes/admin-questions.js';
 import { progressRouter } from './routes/progress.js';
 import { skillsRouter } from './routes/skills.js';
+import { quizzesRouter } from './routes/quizzes.js';
+import { devWorkbenchRouter } from './routes/dev-workbench.js';
 
 const openApiDocument = JSON.parse(readFileSync(new URL('../openapi.json', import.meta.url), 'utf8'));
 const apiDocsDirectory = fileURLToPath(new URL('../docs-ui', import.meta.url));
@@ -36,11 +38,13 @@ export function createApp() {
   if (process.env.NODE_ENV !== 'production') {
     app.get('/api/openapi.json', (_request, response) => response.json(openApiDocument));
     app.use('/api/docs', express.static(apiDocsDirectory, { index: 'index.html' }));
+    app.use('/api/dev/workbench', devWorkbenchRouter);
   }
 
   app.use('/api', authRouter);
   app.use('/api', progressRouter);
   app.use('/api', skillsRouter);
+  app.use('/api', quizzesRouter);
   app.use('/api/admin/questions', adminQuestionsRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api', notFound);

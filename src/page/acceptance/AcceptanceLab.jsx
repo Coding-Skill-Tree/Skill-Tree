@@ -579,6 +579,7 @@ function AcceptanceLab() {
         </div>
         <div className="acceptance-header-meta">
           <span className="acceptance-dev-badge">本機開發工具</span>
+          <a href="/workbench">查看前後端資料流工作台 ↗</a>
           <a href="#acceptance-automated">查看資料庫測試紀錄 ↓</a>
         </div>
       </header>
