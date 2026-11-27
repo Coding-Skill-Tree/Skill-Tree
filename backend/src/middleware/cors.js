@@ -1,5 +1,5 @@
 const ALLOWED_METHODS = 'GET,POST,PATCH,DELETE,OPTIONS';
-const ALLOWED_HEADERS = 'Content-Type,Authorization,X-Request-Id';
+const ALLOWED_HEADERS = 'Content-Type,Authorization,X-Request-Id,Idempotency-Key';
 
 export function corsAllowlist(request, response, next) {
   const origin = request.get('origin');

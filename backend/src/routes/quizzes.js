@@ -5,7 +5,7 @@ import { validationError, HttpError } from "../lib/http-error.js";
 import { pool } from "../db/pool.js";
 import { isTutorialReady } from "../data/tutorials.js";
 import { selectQuestions } from "../lib/quiz-utils.js";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 
 export const quizzesRouter = Router();
 
@@ -20,6 +20,20 @@ quizzesRouter.post(
     try {
       const body = request.body ?? {};
       const skillId = body.skillId;
+      const idempotencyKey = request.get("Idempotency-Key");
+      const uuidPattern =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (
+        typeof idempotencyKey !== "string" ||
+        idempotencyKey.length !== 36 ||
+        !uuidPattern.test(idempotencyKey)
+      ) {
+        throw validationError({
+          idempotencyKey: "Idempotency-Key 格式不正確",
+        });
+      }
+
       if (
         typeof skillId !== "string" ||
         skillId.trim().length === 0 ||
@@ -29,6 +43,9 @@ quizzesRouter.post(
           skillId: "技能ID必須為非空字串，且不得超過80個字元",
         });
       }
+      const idempotencyFingerprint = createHash("sha256")
+        .update(JSON.stringify({ skillId }))
+        .digest();
 
       const userId = request.member.id;
       client = await pool.connect();
@@ -47,6 +64,45 @@ quizzesRouter.post(
 
       if (!memberLockResult.rows[0]) {
         throw new HttpError(401, "UNAUTHENTICATED", "尚未登入");
+      }
+
+      const existingAttemptResult = await client.query(
+        `SELECT id AS "attemptId",
+        skill_id AS "skillId",
+        total_questions AS "totalCount",
+        status,
+        started_at AS "createdAt",
+        idempotency_fingerprint AS "idempotencyFingerprint"
+        FROM quiz_attempts
+        WHERE user_id = $1
+        AND idempotency_key = $2`,
+        [userId, idempotencyKey],
+      );
+      const existingAttempt = existingAttemptResult.rows[0];
+      if (existingAttempt) {
+        if (
+          !existingAttempt.idempotencyFingerprint.equals(idempotencyFingerprint)
+        ) {
+          throw new HttpError(
+            409,
+            "IDEMPOTENCY_KEY_CONFLICT",
+            "相同 Idempotency-key 不可用於不同請求",
+          );
+        }
+        await client.query("COMMIT");
+        transactionStarted = false;
+        return sendSuccess(
+          response,
+          {
+            attemptId: existingAttempt.attemptId,
+            skillId: existingAttempt.skillId,
+            totalCount: existingAttempt.totalCount,
+            passingScore: 80,
+            status: existingAttempt.status,
+            createdAt: existingAttempt.createdAt,
+          },
+          200,
+        );
       }
 
       const skillResult = await client.query(
@@ -109,6 +165,7 @@ quizzesRouter.post(
      AND active = true
      AND status = 'published'
      AND deleted_at IS NULL
+     AND is_demo = false
      AND answer_mode = 'single'
      AND jsonb_array_length(choices) = 3
      AND correct_choices IN (
@@ -131,10 +188,10 @@ quizzesRouter.post(
       );
 
       const availableCount = questionResult.rows.length;
-      if (availableCount < 8) {
+      if (availableCount < 5) {
         throw new HttpError(409, "INSUFFICIENT_QUESTIONS", "有效題目數量不足", {
           availableCount,
-          requiredCount: 8,
+          requiredCount: 5,
         });
       }
       const selectedQuestions = selectQuestions(questionResult.rows, 5);
@@ -149,7 +206,8 @@ quizzesRouter.post(
 
       const catalogVersion = catalogResult.rows[0].catalogVersion;
       await client.query(
-        `DELETE FROM quiz_attempts
+        `UPDATE quiz_attempts
+        SET status = 'cancelled'
         WHERE user_id = $1
         AND skill_id = $2
         AND status = 'in_progress'`,
@@ -158,8 +216,8 @@ quizzesRouter.post(
 
       const attemptId = randomUUID();
       const attemptResult = await client.query(
-        `INSERT INTO quiz_attempts (id, user_id, skill_id, catalog_version, status, total_questions)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO quiz_attempts (id, user_id, skill_id, catalog_version, status, total_questions, skill_title_snapshot, idempotency_key, idempotency_fingerprint)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id AS "attemptId", started_at AS "createdAt"`,
         [
           attemptId,
@@ -168,6 +226,9 @@ quizzesRouter.post(
           catalogVersion,
           "in_progress",
           selectedQuestions.length,
+          skill.title,
+          idempotencyKey,
+          idempotencyFingerprint,
         ],
       );
 
@@ -322,14 +383,10 @@ quizzesRouter.get(
           answer = {
             selectedChoices: question.selectedChoices,
             isCorrect: isCorrect,
-            correctChoices: question.correctChoices,
-            choiceExplanations: question.choiceExplanations,
-            explanation: question.explanation,
           };
         }
         return {
-          questionId: question.questionId,
-          questionIndex: question.ordinal - 1,
+          ordinal: question.ordinal,
           prompt: question.prompt,
           answerMode: question.answerMode,
           choices: question.choices,
