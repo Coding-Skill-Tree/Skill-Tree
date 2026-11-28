@@ -1,0 +1,3547 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Skill Tree Shared API",
+    "version": "1.0.0",
+    "description": "Skill Tree 共用後端 HTTP API。此 OpenAPI 列出目前 E app 已掛載的 routes；成功回應使用 success/data，錯誤使用 success/error。API Explorer 請從前端同源代理開啟（例如 http://localhost:5173/api/docs），再於同一個瀏覽器工作階段測試受保護端點。會員 sid 與管理員 admin_sid 為 HttpOnly cookie，無須也不可手動輸入 cookie 值。請只連開發資料庫；題庫和會員管理寫入會變更資料。新註冊建立可用 session 並導向 onboarding，不寄驗證信；忘記密碼使用六位數一次性驗證碼。題庫查詢、完成紀錄和 XP event producer 是 backend-only services。C 建立／讀題 API 在 PR #93，尚未掛載於此 E branch app；答案提交和結算也尚未提供。E 提供會員限定技能測驗可用性查詢和共用學習歷史，詳見 docs/quiz-api-integration.md。"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "目前開啟 API Explorer 的同源 API"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "服務與資料庫狀態"
+    },
+    {
+      "name": "Member Auth",
+      "description": "會員註冊、登入與個人資料"
+    },
+    {
+      "name": "Admin Auth",
+      "description": "管理員登入與管理後台身份"
+    },
+    {
+      "name": "Members Admin",
+      "description": "管理員會員查詢與停權"
+    },
+    {
+      "name": "Skills",
+      "description": "技能目錄與會員進度"
+    },
+    {
+      "name": "Question Admin",
+      "description": "僅管理員可用的題庫 CRUD；回應包含答案與解析"
+    },
+    {
+      "name": "Quizzes",
+      "description": "會員測驗建立與題目快照讀取；答案與解析不會由本組端點洩漏。"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "檢查 API 與資料庫",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "API 與 PostgreSQL 可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "status": "ok",
+                    "database": "connected"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "註冊會員",
+        "operationId": "registerMember",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              },
+              "example": {
+                "email": "member@example.com",
+                "password": "SkillTree123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "在同一個交易中建立會員、profile 與 sid session；註冊後不需驗證 Email，即可接續 onboarding。寄送歡迎信失敗不會撤銷已建立帳號。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/auth/verify-email": {
+      "post": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "舊版 Email 驗證連結相容",
+        "operationId": "verifyMemberEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email 已驗證",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerifiedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidToken"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "description": "新註冊流程不再寄送驗證連結；此端點只保留給仍有效的舊版連結。"
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "會員登入",
+        "operationId": "loginMember",
+        "description": "成功時設定 HttpOnly sid cookie。API Explorer 的同源請求會在後續呼叫自動帶上 cookie。新註冊帳號建立時即標記 Email 流程完成；舊帳號仍需完成既有驗證或密碼重設流程。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberLoginRequest"
+              },
+              "example": {
+                "email": "member@example.com",
+                "password": "SkillTree123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登入成功並建立會員 session",
+            "headers": {
+              "Set-Cookie": {
+                "$ref": "#/components/headers/MemberSessionCookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidCredentials"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyAttempts"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "會員登出",
+        "operationId": "logoutMember",
+        "description": "撤銷目前瀏覽器的會員 session；沒有有效 session 時仍安全地清除 cookie。",
+        "responses": {
+          "204": {
+            "description": "已登出，無回應本文"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "申請密碼重設",
+        "operationId": "requestPasswordReset",
+        "description": "不論 Email 是否註冊都回相同訊息，避免洩漏會員存在與否。成功時寄出六位數驗證碼；每個 Email 每 60 秒最多寄送一次。驗證碼以 HMAC 雜湊儲存，10 分鐘有效，最多 5 次錯誤輸入。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "通用成功訊息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/auth/reset-password/verify": {
+      "post": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "檢查密碼重設驗證碼",
+        "operationId": "verifyPasswordResetCode",
+        "description": "以 { email, code } 檢查六位數驗證碼，不消耗成功驗證的碼；錯誤輸入會累計，最多 5 次。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetCodeVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "token 有效，無回應本文"
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidResetCode"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "使用驗證碼重設密碼",
+        "operationId": "resetMemberPassword",
+        "description": "以 Email、六位數驗證碼和新密碼完成重設。成功後驗證碼會被消耗，該會員所有既有 sessions 都會撤銷。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetCodePasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "密碼已重設，無回應本文"
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidResetCode"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "已登入會員變更密碼",
+        "operationId": "changeMemberPassword",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "description": "若帳號原本有密碼，currentPassword 必填；成功後撤銷其他 session，保留目前 session。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "密碼已更新，無回應本文"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/MemberUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "取得目前登入會員",
+        "operationId": "getCurrentMember",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "description": "會員身份只由 sid cookie 推導；忽略前端傳入的 userId。",
+        "responses": {
+          "200": {
+            "description": "目前會員資料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/MemberUnauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/me/profile": {
+      "patch": {
+        "tags": [
+          "Member Auth"
+        ],
+        "summary": "更新會員暱稱與頭像",
+        "operationId": "updateCurrentMemberProfile",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "description": "更新目前 session 所屬會員，成功後標記 onboarding 完成；username 需 2–12 字，只能用中文、英文、數字與底線。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberProfileRequest"
+              },
+              "example": {
+                "username": "小明",
+                "avatarId": "avatar-03"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新後的會員資料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/MemberUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/auth/login": {
+      "post": {
+        "tags": [
+          "Admin Auth"
+        ],
+        "summary": "管理員登入",
+        "operationId": "loginAdmin",
+        "description": "成功時設定 HttpOnly admin_sid cookie；與會員 sid 完全分離。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginRequest"
+              },
+              "example": {
+                "username": "site_admin",
+                "password": "AdminPass123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登入成功",
+            "headers": {
+              "Set-Cookie": {
+                "$ref": "#/components/headers/AdminSessionCookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyAttempts"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/me": {
+      "get": {
+        "tags": [
+          "Admin Auth"
+        ],
+        "summary": "取得目前管理員",
+        "operationId": "getCurrentAdmin",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "目前管理員資料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/auth/logout": {
+      "post": {
+        "tags": [
+          "Admin Auth"
+        ],
+        "summary": "管理員登出",
+        "operationId": "logoutAdmin",
+        "responses": {
+          "204": {
+            "description": "已登出，無回應本文"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/members": {
+      "get": {
+        "tags": [
+          "Members Admin"
+        ],
+        "summary": "搜尋會員並分頁",
+        "operationId": "listMembers",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "description": "暱稱或 Email 的不分大小寫字面子字串；最多 100 字。",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "從 1 開始；超過末頁會正規化至最後一頁。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "會員列表與分頁資料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/members/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MemberId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Members Admin"
+        ],
+        "summary": "讀取會員詳情",
+        "operationId": "getMemberDetails",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "會員與遊戲進度資料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberDetailsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/MemberNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/members/{id}/suspend": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MemberId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Members Admin"
+        ],
+        "summary": "停權會員",
+        "operationId": "suspendMember",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "description": "冪等操作。首次停權會撤銷該會員所有 session 並寫入管理稽核紀錄；回傳更新後的會員詳情。",
+        "responses": {
+          "200": {
+            "description": "更新後的會員詳情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberDetailsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/MemberNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/members/{id}/restore": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MemberId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Members Admin"
+        ],
+        "summary": "恢復會員",
+        "operationId": "restoreMember",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "description": "冪等操作。首次恢復會寫入管理稽核紀錄；回傳更新後的會員詳情。",
+        "responses": {
+          "200": {
+            "description": "更新後的會員詳情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberDetailsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/MemberNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/skills": {
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "讀取啟用技能目錄",
+        "operationId": "getSkills",
+        "responses": {
+          "200": {
+            "description": "技能分類、節點、位置、先修關係及目錄版本",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillCatalogResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/progress": {
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "讀取目前會員進度",
+        "operationId": "getMemberProgress",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "完成技能清單與 revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/MemberUnauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/questions/summary": {
+      "get": {
+        "tags": [
+          "Question Admin"
+        ],
+        "summary": "讀取題庫統計摘要",
+        "operationId": "getQuestionSummary",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "題目總數、分類分布與最近更新",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/questions/options": {
+      "get": {
+        "tags": [
+          "Question Admin"
+        ],
+        "summary": "讀取題庫表單分類與技能選項",
+        "operationId": "getQuestionOptions",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "啟用中的分類與技能",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionOptionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/questions": {
+      "get": {
+        "tags": [
+          "Question Admin"
+        ],
+        "summary": "搜尋題目並分頁",
+        "operationId": "listQuestions",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "published"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "題目列表與分頁資訊；列表不含答案欄位",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Question Admin"
+        ],
+        "summary": "新增題目",
+        "operationId": "createQuestion",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "description": "管理員限定。單選題 correctChoices 恰有一個索引；多選題至少兩個。每個選項必須有對應解析。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionWriteRequest"
+              },
+              "example": {
+                "skillId": "html-basics",
+                "prompt": "HTML 的全名是什麼？",
+                "choices": [
+                  "HyperText Markup Language",
+                  "HighText Machine Language"
+                ],
+                "answerMode": "single",
+                "correctChoices": [
+                  0
+                ],
+                "choiceExplanations": [
+                  "這是 HTML 的正式名稱。",
+                  "這不是 HTML 的名稱。"
+                ],
+                "explanation": "HTML 用於描述網頁文件的結構。",
+                "difficulty": "beginner",
+                "status": "draft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "建立完成的題目（管理員資料，包含正解）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/QuestionConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/questions/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/QuestionId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Question Admin"
+        ],
+        "summary": "讀取單題管理資料",
+        "operationId": "getQuestion",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "description": "管理員限定；回應包含 correctChoices、choiceExplanations 和 explanation，不可用於學生作答前的公開題目 API。",
+        "responses": {
+          "200": {
+            "description": "題目完整管理資料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/QuestionNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Question Admin"
+        ],
+        "summary": "完整更新題目",
+        "operationId": "updateQuestion",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "description": "管理員限定；資料格式與新增題目相同。此更新會完整覆寫題目欄位。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新後題目（管理員資料，包含正解）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/QuestionNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/QuestionConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Question Admin"
+        ],
+        "summary": "軟刪除題目",
+        "operationId": "deleteQuestion",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "description": "將題目設為停用並填入 deleted_at；不會實體刪除資料。",
+        "responses": {
+          "204": {
+            "description": "題目已軟刪除，無回應本文"
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/QuestionNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/progress/history": {
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "讀取會員學習歷史",
+        "description": "目前以已完成的測驗 attempt 作為學習活動來源；可用 skillId 篩選。會員身分由 sid session 決定。帶 cursor 請沿用同一個 skillId 篩選。",
+        "operationId": "getMemberLearningHistory",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skillId",
+            "in": "query",
+            "required": false,
+            "description": "選填；只回傳指定技能的活動。使用 cursor 時需沿用同一個 skillId。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "每頁筆數，預設 20，最多 50。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "使用上一頁回傳的 nextCursor；不透明 keyset 游標。",
+            "schema": {
+              "type": "string",
+              "maxLength": 256
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "會員已完成的測驗學習活動；無紀錄時 items 為空陣列。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/MemberUnauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/team": {
+      "get": {
+        "tags": [
+          "Admin Auth"
+        ],
+        "summary": "列出組員帳號",
+        "operationId": "listAdminTeam",
+        "description": "僅 owner 可讀取；不回傳密碼雜湊或會員資料。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "組員帳號清單",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "username",
+                          "role",
+                          "disabledAt",
+                          "createdAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "editor"
+                            ]
+                          },
+                          "disabledAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyAttempts"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/admin/team/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          }
+        }
+      ],
+      "patch": {
+        "tags": [
+          "Admin Auth"
+        ],
+        "summary": "停用或恢復組員帳號",
+        "operationId": "updateAdminTeamAccount",
+        "description": "僅 owner 可操作。停用會撤銷該帳號的現有管理員 session。角色建立／變更只能由可信任主機使用 migration credential 執行。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "disabled": {
+                    "type": "boolean",
+                    "description": "true 停用並撤銷 session；false 恢復登入。"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新後的組員帳號",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AdminUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRequest"
+          },
+          "404": {
+            "description": "找不到組員帳號",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyAttempts"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/api/skills/{skillId}/quiz-availability": {
+      "parameters": [
+        {
+          "name": "skillId",
+          "in": "path",
+          "required": true,
+          "description": "技能目錄中的 skillId。",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "查詢會員是否可開始該技能測驗",
+        "description": "只回傳可用狀態、原因、缺少的先修技能 ID 和符合 C v1 題型的題數；不回傳題目或正解。開始測驗的 POST 必須在 transaction 內重新檢查。教材 ready 狀態目前沒有共用 schema 欄位。",
+        "operationId": "getQuizAvailability",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "目前會員的測驗可用狀態",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizAvailabilityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/MemberUnauthorized"
+          },
+          "404": {
+            "description": "技能不存在或已停用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseUnavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "memberSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sid",
+        "description": "由 POST /api/auth/login 設定的 HttpOnly cookie。請從同源 API Explorer 登入；瀏覽器會自動附帶，不要手動貼上 cookie。"
+      },
+      "adminSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "admin_sid",
+        "description": "由 POST /api/admin/auth/login 設定的 HttpOnly cookie。請從同源 API Explorer 登入；瀏覽器會自動附帶，不要手動貼上 cookie。"
+      }
+    },
+    "headers": {
+      "MemberSessionCookie": {
+        "description": "HttpOnly、SameSite=Lax 的會員 sid；production 另設 Secure。",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "AdminSessionCookie": {
+        "description": "HttpOnly、SameSite=Lax 的管理員 admin_sid；production 另設 Secure。",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "parameters": {
+      "MemberId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "正整數會員 ID，以十進位字串表示。",
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$",
+          "maxLength": 19
+        }
+      },
+      "QuestionId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "正整數題目 ID，以十進位字串表示。",
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$",
+          "maxLength": 19
+        }
+      }
+    },
+    "responses": {
+      "ForbiddenRequest": {
+        "description": "請求來源未列入 APP_ORIGINS allowlist，或會員帳號無權執行此操作。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "examples": {
+              "originNotAllowed": {
+                "summary": "不允許的來源",
+                "value": {
+                  "success": false,
+                  "error": {
+                    "code": "ORIGIN_NOT_ALLOWED",
+                    "message": "不允許此來源執行操作",
+                    "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+                  }
+                }
+              },
+              "accountSuspended": {
+                "summary": "會員已停權",
+                "value": {
+                  "success": false,
+                  "error": {
+                    "code": "ACCOUNT_SUSPENDED",
+                    "message": "此帳號已被停權",
+                    "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "JSON request body 超過 1 MB 限制。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "PAYLOAD_TOO_LARGE",
+                "message": "請求內容超過大小限制",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+              }
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "請求欄位、JSON 或參數格式無效。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "表單內容有誤",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01",
+                "fields": {
+                  "email": "請輸入有效的 Email"
+                }
+              }
+            }
+          }
+        }
+      },
+      "InvalidToken": {
+        "description": "一次性 token 無效、已使用或過期。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "INVALID_OR_EXPIRED_TOKEN",
+                "message": "連結無效或已過期",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+              }
+            }
+          }
+        }
+      },
+      "MemberUnauthorized": {
+        "description": "沒有有效的會員 sid session。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "UNAUTHENTICATED",
+                "message": "尚未登入",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+              }
+            }
+          }
+        }
+      },
+      "AdminUnauthorized": {
+        "description": "沒有有效的管理員 admin_sid session。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "ADMIN_UNAUTHENTICATED",
+                "message": "請先登入後台",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+              }
+            }
+          }
+        }
+      },
+      "InvalidCredentials": {
+        "description": "帳號或密碼錯誤。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "AccountSuspended": {
+        "description": "會員帳號已停權。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "TooManyAttempts": {
+        "description": "登入嘗試達節流門檻。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Email 或會員暱稱衝突。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "QuestionConflict": {
+        "description": "該技能已有相同題目。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "MemberNotFound": {
+        "description": "會員不存在或 ID 無效。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "MEMBER_NOT_FOUND",
+                "message": "找不到這位會員",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+              }
+            }
+          }
+        }
+      },
+      "QuestionNotFound": {
+        "description": "題目不存在或 ID 無效。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "QUESTION_NOT_FOUND",
+                "message": "找不到這道題目",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+              }
+            }
+          }
+        }
+      },
+      "DatabaseUnavailable": {
+        "description": "資料庫暫時無法連線。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "DATABASE_UNAVAILABLE",
+                "message": "資料庫暫時無法連線",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+              }
+            }
+          }
+        }
+      },
+      "UnexpectedError": {
+        "description": "未預期的 API 錯誤；使用 error.requestId 協助查 log。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "InvalidResetCode": {
+        "description": "重設驗證碼無效、已使用、已過期或已達輸入次數上限；密碼欄位驗證錯誤也使用同一錯誤 envelope。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "INVALID_OR_EXPIRED_CODE",
+                "message": "驗證碼無效、已過期或已達輸入次數上限",
+                "requestId": "a7d2f8a4-8134-4c43-83cf-3092a0c2ef01"
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "error"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "requestId"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "status",
+              "database"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ok"
+                ]
+              },
+              "database": {
+                "type": "string",
+                "enum": [
+                  "connected"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Member": {
+        "type": "object",
+        "required": [
+          "userId",
+          "email",
+          "createdAt",
+          "username",
+          "avatarId",
+          "route",
+          "onboardingCompleted",
+          "hasPassword"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarId": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "avatar-01",
+              "avatar-02",
+              "avatar-03",
+              "avatar-04",
+              "avatar-05",
+              "avatar-06"
+            ]
+          },
+          "route": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "beginner",
+              "experienced"
+            ]
+          },
+          "onboardingCompleted": {
+            "type": "boolean"
+          },
+          "hasPassword": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MemberResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Member"
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "password": {
+            "$ref": "#/components/schemas/Password"
+          }
+        }
+      },
+      "MemberLoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      },
+      "AdminLoginRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_]{3,32}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      },
+      "Password": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 25,
+        "pattern": "^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]+$",
+        "description": "8–25 個英數字，至少各含一個英文字母與數字。"
+      },
+      "TokenRequest": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": [
+          "token",
+          "password"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "password": {
+            "$ref": "#/components/schemas/Password"
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": [
+          "newPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "帳號已有密碼時必填；OAuth/初次設定密碼帳號可省略。"
+          },
+          "newPassword": {
+            "$ref": "#/components/schemas/Password"
+          }
+        }
+      },
+      "MemberProfileRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "avatarId"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 12,
+            "pattern": "^[\\p{Script=Han}A-Za-z0-9_]+$"
+          },
+          "avatarId": {
+            "type": "string",
+            "enum": [
+              "avatar-01",
+              "avatar-02",
+              "avatar-03",
+              "avatar-04",
+              "avatar-05",
+              "avatar-06"
+            ]
+          }
+        }
+      },
+      "Admin": {
+        "type": "object",
+        "required": [
+          "adminId",
+          "username",
+          "role"
+        ],
+        "properties": {
+          "adminId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "username": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "editor"
+            ],
+            "description": "owner 為唯一最高管理者；editor 為組員瀏覽／編輯權限。"
+          }
+        }
+      },
+      "AdminResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Admin"
+          }
+        }
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "userId",
+              "email",
+              "createdAt",
+              "username",
+              "avatarId",
+              "route",
+              "onboardingCompleted",
+              "hasPassword",
+              "nextStep"
+            ],
+            "properties": {
+              "userId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "username": {
+                "type": "string",
+                "nullable": true
+              },
+              "avatarId": {
+                "type": "string",
+                "nullable": true
+              },
+              "route": {
+                "type": "string",
+                "nullable": true
+              },
+              "onboardingCompleted": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              },
+              "hasPassword": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              },
+              "nextStep": {
+                "type": "string",
+                "enum": [
+                  "/onboarding"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "EmailVerifiedResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "emailVerified"
+            ],
+            "properties": {
+              "emailVerified": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            }
+          }
+        }
+      },
+      "MessageResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "message"
+            ],
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "MemberListItem": {
+        "type": "object",
+        "required": [
+          "userId",
+          "username",
+          "avatarId",
+          "email",
+          "createdAt",
+          "suspended"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarId": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "suspended": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MemberListResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "items",
+              "page",
+              "pageSize",
+              "total",
+              "totalPages"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/MemberListItem"
+                }
+              },
+              "page": {
+                "type": "integer"
+              },
+              "pageSize": {
+                "type": "integer",
+                "enum": [
+                  20
+                ]
+              },
+              "total": {
+                "type": "integer"
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      },
+      "MemberDetails": {
+        "type": "object",
+        "required": [
+          "userId",
+          "role",
+          "username",
+          "avatarId",
+          "email",
+          "createdAt",
+          "learningRoute",
+          "onboardingCompleted",
+          "googleLinked",
+          "suspended",
+          "suspendedAt",
+          "xp",
+          "level",
+          "courseProgress"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarId": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "learningRoute": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "beginner",
+              "experienced"
+            ]
+          },
+          "onboardingCompleted": {
+            "type": "boolean"
+          },
+          "googleLinked": {
+            "type": "boolean"
+          },
+          "suspended": {
+            "type": "boolean"
+          },
+          "suspendedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "xp": {
+            "type": "string",
+            "pattern": "^-?[0-9]+$"
+          },
+          "level": {
+            "type": "integer"
+          },
+          "courseProgress": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CourseProgress"
+            }
+          }
+        }
+      },
+      "CourseProgress": {
+        "type": "object",
+        "required": [
+          "courseName",
+          "currentLevel",
+          "totalLevels"
+        ],
+        "properties": {
+          "courseName": {
+            "type": "string"
+          },
+          "currentLevel": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalLevels": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "MemberDetailsResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/MemberDetails"
+          }
+        }
+      },
+      "SkillCatalogResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "catalogVersion",
+              "categories",
+              "skills"
+            ],
+            "properties": {
+              "catalogVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SkillCategory"
+                }
+              },
+              "skills": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Skill"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SkillCategory": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "sortOrder"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer"
+          }
+        }
+      },
+      "Skill": {
+        "type": "object",
+        "required": [
+          "skillId",
+          "categoryId",
+          "category",
+          "title",
+          "description",
+          "learningItems",
+          "catalogVersion",
+          "sortOrder",
+          "prerequisiteSkillIds",
+          "position"
+        ],
+        "properties": {
+          "skillId": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "learningItems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "catalogVersion": {
+            "type": "integer"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "prerequisiteSkillIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "position": {
+            "type": "object",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "ProgressResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "catalogVersion",
+              "revision",
+              "completedSkillIds"
+            ],
+            "properties": {
+              "catalogVersion": {
+                "type": "integer"
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              "completedSkillIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "QuestionWriteRequest": {
+        "type": "object",
+        "required": [
+          "skillId",
+          "prompt",
+          "choices",
+          "choiceExplanations",
+          "explanation",
+          "difficulty",
+          "status"
+        ],
+        "description": "正式呼叫請使用 answerMode + correctChoices。舊版 correctChoice 僅為相容欄位。",
+        "properties": {
+          "skillId": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "choices": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 180
+            }
+          },
+          "answerMode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multiple"
+            ],
+            "default": "single"
+          },
+          "correctChoices": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "從 0 起算的選項索引。single 恰 1 個；multiple 至少 2 個。"
+          },
+          "correctChoice": {
+            "type": "integer",
+            "minimum": 0,
+            "deprecated": true,
+            "description": "舊版單選相容欄位；新呼叫請用 correctChoices。"
+          },
+          "choiceExplanations": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1200
+            },
+            "description": "每一筆需與 choices 同索引對應。"
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1200
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "correctChoices"
+            ]
+          },
+          {
+            "required": [
+              "correctChoice"
+            ]
+          }
+        ]
+      },
+      "QuestionListItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "skillId",
+          "skillTitle",
+          "categoryId",
+          "category",
+          "prompt",
+          "status",
+          "difficulty",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "skillId": {
+            "type": "string"
+          },
+          "skillTitle": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Question": {
+        "type": "object",
+        "required": [
+          "id",
+          "skillId",
+          "skillTitle",
+          "categoryId",
+          "category",
+          "prompt",
+          "choices",
+          "answerMode",
+          "correctChoices",
+          "choiceExplanations",
+          "correctChoice",
+          "explanation",
+          "difficulty",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "skillId": {
+            "type": "string"
+          },
+          "skillTitle": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "answerMode": {
+            "type": "string",
+            "enum": [
+              "single"
+            ]
+          },
+          "correctChoices": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "choiceExplanations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "correctChoice": {
+            "type": "integer",
+            "nullable": true,
+            "description": "只對 single 題提供；multiple 回 null。"
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "QuestionResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Question"
+          }
+        }
+      },
+      "QuestionListResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "items",
+              "page",
+              "pageSize",
+              "total",
+              "totalPages"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/QuestionListItem"
+                }
+              },
+              "page": {
+                "type": "integer"
+              },
+              "pageSize": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      },
+      "QuestionSummaryResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "total",
+              "publishedCount",
+              "draftCount",
+              "categories",
+              "recent"
+            ],
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "publishedCount": {
+                "type": "integer"
+              },
+              "draftCount": {
+                "type": "integer"
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "categoryId",
+                    "category",
+                    "count"
+                  ],
+                  "properties": {
+                    "categoryId": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "recent": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "prompt",
+                    "status",
+                    "updatedAt",
+                    "category"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "category": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "QuestionOptionsResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "categories",
+              "skills"
+            ],
+            "properties": {
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "skills": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "skillId",
+                    "title",
+                    "categoryId",
+                    "category"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "skillId": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "categoryId": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "LearningHistoryResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "items",
+              "nextCursor"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/LearningHistoryItem"
+                }
+              },
+              "nextCursor": {
+                "type": "string",
+                "nullable": true,
+                "maxLength": 256
+              }
+            }
+          }
+        }
+      },
+      "LearningHistoryItem": {
+        "type": "object",
+        "required": [
+          "activityId",
+          "activityType",
+          "skillId",
+          "skillTitle",
+          "catalogVersion",
+          "completedAt",
+          "result"
+        ],
+        "properties": {
+          "activityId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "等於 quiz attempt ID。"
+          },
+          "activityType": {
+            "type": "string",
+            "enum": [
+              "quiz_attempt"
+            ]
+          },
+          "skillId": {
+            "type": "string"
+          },
+          "skillTitle": {
+            "type": "string"
+          },
+          "catalogVersion": {
+            "type": "integer"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "type": "object",
+            "required": [
+              "correctCount",
+              "totalQuestions",
+              "passed"
+            ],
+            "properties": {
+              "correctCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "totalQuestions": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "passed": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "QuizAttemptCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "skillId"
+        ],
+        "properties": {
+          "skillId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "已啟用的技能 ID；會員需先完成所有先修技能。"
+          }
+        }
+      },
+      "QuizAttemptQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ordinal",
+          "prompt",
+          "choices",
+          "answerMode",
+          "selectedChoices",
+          "answeredAt"
+        ],
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 10,
+            "items": {
+              "type": "string"
+            }
+          },
+          "answerMode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multiple"
+            ]
+          },
+          "selectedChoices": {
+            "type": "array",
+            "maxItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9
+            },
+            "description": "選項索引從 0 起算；未作答時為空陣列。"
+          },
+          "answeredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "QuizAttempt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId",
+          "skillId",
+          "skillTitle",
+          "catalogVersion",
+          "status",
+          "totalQuestions",
+          "startedAt",
+          "questions"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string"
+          },
+          "skillTitle": {
+            "type": "string",
+            "description": "建立時保存的技能名稱快照。"
+          },
+          "catalogVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_progress",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "totalQuestions": {
+            "type": "integer",
+            "enum": [
+              5
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "questions": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/QuizAttemptQuestion"
+            }
+          }
+        }
+      },
+      "QuizAttemptSuccessResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/QuizAttempt"
+          }
+        }
+      },
+      "ResetCodeVerifyRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "code"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "description": "保留前導零的六位數字字串。"
+          }
+        }
+      },
+      "ResetCodePasswordRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "code",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "description": "保留前導零的六位數字字串。"
+          },
+          "password": {
+            "$ref": "#/components/schemas/Password"
+          }
+        }
+      },
+      "QuizAvailabilityResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "skillId",
+              "available",
+              "reason",
+              "missingPrerequisiteSkillIds",
+              "availableQuestionCount",
+              "requiredQuestionCount"
+            ],
+            "properties": {
+              "skillId": {
+                "type": "string"
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "SKILL_LOCKED",
+                  "INSUFFICIENT_QUESTIONS"
+                ]
+              },
+              "missingPrerequisiteSkillIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "availableQuestionCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "requiredQuestionCount": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

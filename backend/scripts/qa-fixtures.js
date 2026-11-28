@@ -28,7 +28,7 @@ if (!/^[^@\s]+@[^@\s]+\.test$/u.test(email)) {
     if (!member.emailVerifiedAt) throw new Error('Verify this .test member through the local development email link first.');
 
     const skillId = QA_FIXTURE_SKILL_ID;
-    const skillResult = await client.query('SELECT catalog_version AS version FROM skills WHERE id = $1 AND active = true', [skillId]);
+    const skillResult = await client.query('SELECT catalog_version AS version, title FROM skills WHERE id = $1 AND active = true', [skillId]);
     if (!skillResult.rowCount) throw new Error('The html-basics development skill is missing; run db:seed first.');
     const questionResult = await client.query(
       `SELECT id, prompt, choices, answer_mode AS "answerMode",
@@ -54,10 +54,10 @@ if (!/^[^@\s]+@[^@\s]+\.test$/u.test(email)) {
 
     await client.query(
       `INSERT INTO quiz_attempts
-        (id, user_id, skill_id, catalog_version, status, total_questions, correct_count, passed, started_at, completed_at)
-       VALUES ($1, $2, $3, $4, 'completed', 5, 4, true, now() - interval '10 minutes', now())
+        (id, user_id, skill_id, skill_title_snapshot, catalog_version, status, total_questions, correct_count, passed, started_at, completed_at)
+       VALUES ($1, $2, $3, $5, $4, 'completed', 5, 4, true, now() - interval '10 minutes', now())
        ON CONFLICT (id) DO NOTHING`,
-      [attemptId, member.id, skillId, skillResult.rows[0].version],
+      [attemptId, member.id, skillId, skillResult.rows[0].version, skillResult.rows[0].title],
     );
     const existingAttempt = await client.query(
       `SELECT user_id::text AS "userId", skill_id AS "skillId", status, correct_count AS "correctCount"

@@ -1,21 +1,13 @@
 import { createHash } from 'node:crypto';
 import { pool } from '../db/pool.js';
 import { HttpError } from '../lib/http-error.js';
-
-const DEFAULT_MAX_FAILURES = 5;
-const DEFAULT_WINDOW_MINUTES = 15;
-const DEFAULT_COOLDOWN_MINUTES = 5;
-
-function positiveInteger(value, fallback) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
+import { runtimeConfig } from '../lib/runtime-config.js';
 
 function policy() {
   return {
-    maxFailures: positiveInteger(process.env.LOGIN_MAX_FAILURES, DEFAULT_MAX_FAILURES),
-    windowMinutes: positiveInteger(process.env.LOGIN_FAILURE_WINDOW_MINUTES, DEFAULT_WINDOW_MINUTES),
-    cooldownMinutes: positiveInteger(process.env.LOGIN_COOLDOWN_MINUTES, DEFAULT_COOLDOWN_MINUTES),
+    maxFailures: runtimeConfig.loginMaxFailures,
+    windowMinutes: runtimeConfig.loginFailureWindowMinutes,
+    cooldownMinutes: runtimeConfig.loginCooldownMinutes,
   };
 }
 

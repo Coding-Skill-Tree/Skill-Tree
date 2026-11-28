@@ -1,19 +1,13 @@
 import { useCallback, useRef, useState } from "react";
-import { DEMO, FORGOT_TEXT, ROUTES } from "./data/authContent.js";
+import { FORGOT_TEXT, ROUTES } from "./data/authContent.js";
 import { normalizeEmail, validateEmail } from "./utils/validators.js";
-import { requestPasswordReset } from "./utils/fakeAuthApi.js";
+import { ApiRequestError } from "../../../services/api.js";
+import { requestPasswordReset } from "../../../services/memberAuth.js";
 import AuthHeader from "./components/AuthHeader/AuthHeader.jsx";
 import AuthCard from "./components/AuthCard/AuthCard.jsx";
 import TextField from "./components/TextField/TextField.jsx";
 import Modal from "./components/Modal/Modal.jsx";
 import FloatingNotice from "./components/FloatingNotice/FloatingNotice.jsx";
-import DemoHint from "./components/DemoHint/DemoHint.jsx";
-
-// 後端錯誤碼 → 錯誤訊息後面接的連結
-const ERROR_ACTIONS = {
-  ACCOUNT_NOT_FOUND: { label: FORGOT_TEXT.goRegister, href: ROUTES.register },
-  GOOGLE_ONLY_ACCOUNT: { label: FORGOT_TEXT.backToLogin, href: ROUTES.login },
-};
 
 function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -28,8 +22,6 @@ function ForgotPasswordPage() {
 
   const emailError = validateEmail(email);
   const visibleError = serverError?.message || (touched ? emailError : "");
-  const errorAction = serverError ? ERROR_ACTIONS[serverError.code] : undefined;
-
   function handleEmailChange(value) {
     setEmail(value);
     setServerError(null); // 改了 Email 就清掉上一次的查詢結果
@@ -45,23 +37,27 @@ function ForgotPasswordPage() {
 
     setSending(true);
     setServerError(null);
-    const { status, body } = await requestPasswordReset(normalizeEmail(email));
-    setSending(false);
-
-    if (status === 200) {
-      setSentOpen(true); // 留在本頁，Email 保留
-    } else if (body?.error && ERROR_ACTIONS[body.error.code]) {
-      setServerError(body.error);
-      inputRef.current?.focus();
-    } else {
-      setNotice({ id: Date.now(), text: FORGOT_TEXT.genericError });
+    try {
+      await requestPasswordReset(normalizeEmail(email));
+      setSentOpen(true);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status < 500) {
+        setServerError({ message: error.message });
+        inputRef.current?.focus();
+      } else {
+        setNotice({ id: Date.now(), text: FORGOT_TEXT.genericError });
+      }
+    } finally {
+      setSending(false);
     }
   }
 
-  // 關閉後焦點回到送出按鈕（由 Modal 的 returnFocusRef 處理），Email 保留
+  // Modal 的 returnFocusRef 會在關閉時把焦點放回送出按鈕；Email 保留。
   function closeSentDialog() {
     setSentOpen(false);
   }
+
+  const resetHref = "/reset-password";
 
   return (
     <div className="auth-page">
@@ -71,17 +67,6 @@ function ForgotPasswordPage() {
       <AuthCard
         title={FORGOT_TEXT.title}
         description={FORGOT_TEXT.description}
-        footer={
-          <DemoHint>
-            <ul className="demo-hint-list">
-              {DEMO.forgot.map((item) => (
-                <li key={item.email}>
-                  <code>{item.email}</code> → {item.result}
-                </li>
-              ))}
-            </ul>
-          </DemoHint>
-        }
       >
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <TextField
@@ -95,7 +80,6 @@ function ForgotPasswordPage() {
             onChange={handleEmailChange}
             onBlur={() => setTouched(true)}
             error={visibleError}
-            errorAction={errorAction}
           />
 
           <div className="auth-form-actions">
@@ -121,9 +105,9 @@ function ForgotPasswordPage() {
             {FORGOT_TEXT.sentMessage}
           </p>
           <div className="modal-actions">
-            <button type="button" className="btn btn-primary" onClick={closeSentDialog} autoFocus>
+            <a className="btn btn-primary" href={resetHref} autoFocus>
               {FORGOT_TEXT.sentConfirm}
-            </button>
+            </a>
           </div>
         </div>
       </Modal>

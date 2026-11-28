@@ -1,48 +1,64 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { sendSuccess } from '../lib/api-response.js';
+import { readActiveCatalogVersion } from '../services/progress-service.js';
+import { requireMember } from '../middleware/require-member.js';
+import { HttpError, validationError } from '../lib/http-error.js';
+import { getQuizAvailability } from '../services/question-bank.js';
 
 export const skillsRouter = Router();
+
+skillsRouter.get('/skills/:skillId/quiz-availability', requireMember, async (request, response, next) => {
+  const { skillId } = request.params;
+  if (!skillId || skillId.length > 80 || skillId !== skillId.trim()) {
+    return next(validationError({ skillId: '技能 ID 必須是 1 到 80 個字元，且不可包含前後空白' }));
+  }
+  try {
+    const availability = await getQuizAvailability(pool, {
+      userId: request.member.id,
+      skillId,
+    });
+    if (availability.reason === 'SKILL_NOT_FOUND') {
+      return next(new HttpError(404, 'SKILL_NOT_FOUND', '技能不存在或已停用'));
+    }
+    return sendSuccess(response, availability);
+  } catch (error) {
+    return next(error);
+  }
+});
 
 skillsRouter.get('/skills', async (_request, response, next) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-    const [catalog, categories, skills] = await Promise.all([
-      client.query(
-        `SELECT COALESCE(MAX(s.catalog_version), 1)::int AS version
-         FROM skills s
-         JOIN skill_categories c ON c.id = s.category_id
-         WHERE s.active = true AND c.active = true`,
-      ),
-      client.query(
-        `SELECT c.id, c.name, c.sort_order AS "sortOrder"
-         FROM skill_categories c
-         WHERE c.active = true
-         ORDER BY c.sort_order, c.name`,
-      ),
-      client.query(
-        `SELECT s.id AS "skillId", s.category_id AS "categoryId", c.name AS category,
-                s.title, s.description, s.learning_items AS "learningItems",
-                s.position_x AS "positionX", s.position_y AS "positionY",
-                s.catalog_version AS "catalogVersion", s.sort_order AS "sortOrder",
-                COALESCE(
-                  jsonb_agg(sp.prerequisite_skill_id ORDER BY prerequisite.sort_order, prerequisite.title)
-                    FILTER (WHERE sp.prerequisite_skill_id IS NOT NULL),
-                  '[]'::jsonb
-                ) AS "prerequisiteSkillIds"
-         FROM skills s
-         JOIN skill_categories c ON c.id = s.category_id
-         LEFT JOIN skill_prerequisites sp ON sp.skill_id = s.id
-         LEFT JOIN skills prerequisite ON prerequisite.id = sp.prerequisite_skill_id
-         WHERE s.active = true AND c.active = true
-         GROUP BY s.id, c.id, c.name
-         ORDER BY c.sort_order, s.sort_order, s.title`,
-      ),
-    ]);
+    const catalogVersion = await readActiveCatalogVersion(client);
+    const categories = await client.query(
+      `SELECT c.id, c.name, c.sort_order AS "sortOrder"
+       FROM skill_categories c
+       WHERE c.active = true
+       ORDER BY c.sort_order, c.name`,
+    );
+    const skills = await client.query(
+      `SELECT s.id AS "skillId", s.category_id AS "categoryId", c.name AS category,
+              s.title, s.description, s.learning_items AS "learningItems",
+              s.position_x AS "positionX", s.position_y AS "positionY",
+              s.catalog_version AS "catalogVersion", s.sort_order AS "sortOrder",
+              COALESCE(
+                jsonb_agg(sp.prerequisite_skill_id ORDER BY prerequisite.sort_order, prerequisite.title)
+                  FILTER (WHERE sp.prerequisite_skill_id IS NOT NULL),
+                '[]'::jsonb
+              ) AS "prerequisiteSkillIds"
+       FROM skills s
+       JOIN skill_categories c ON c.id = s.category_id
+       LEFT JOIN skill_prerequisites sp ON sp.skill_id = s.id
+       LEFT JOIN skills prerequisite ON prerequisite.id = sp.prerequisite_skill_id
+       WHERE s.active = true AND c.active = true
+       GROUP BY s.id, c.id, c.name
+       ORDER BY c.sort_order, s.sort_order, s.title`,
+    );
     await client.query('COMMIT');
     sendSuccess(response, {
-      catalogVersion: catalog.rows[0].version,
+      catalogVersion,
       categories: categories.rows,
       skills: skills.rows.map(({ positionX, positionY, ...skill }) => ({
         ...skill,

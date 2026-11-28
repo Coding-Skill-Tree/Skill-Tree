@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 820" role="img" aria-labelledby="title description">
+  <title id="title">Skill Tree 共用後端與跨模組整合狀態</title>
+  <desc id="description">A 到 D 使用共用 Express API 和 PostgreSQL。C 的建立／讀題 API 在 PR 93 尚未合入；E 提供測驗 availability、migration、題庫與 history service。C 作答結算與 D worker 尚待模組負責人接入。資料庫 migrations 001 到 012。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#52756A" />
+    </marker>
+    <marker id="pending-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#B77A2D" />
+    </marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans CJK TC", sans-serif; fill: #18342d; }
+      .title { font-size: 32px; font-weight: 700; }
+      .subtitle { font-size: 16px; fill: #527067; }
+      .section { font-size: 14px; font-weight: 700; letter-spacing: 1px; fill: #527067; }
+      .card-title { font-size: 20px; font-weight: 700; }
+      .card-copy { font-size: 14px; fill: #36574e; }
+      .small { font-size: 12px; fill: #527067; }
+      .card { fill: #f4f8f5; stroke: #c9d9d0; stroke-width: 2; }
+      .api { fill: #e8f4ee; stroke: #86b29b; stroke-width: 2; }
+      .pending { fill: #fff8ec; stroke: #d6ad70; stroke-width: 2; stroke-dasharray: 8 6; }
+      .database { fill: #edf2ff; stroke: #9baed6; stroke-width: 2; }
+      .implemented-line { stroke: #52756A; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .pending-line { stroke: #B77A2D; stroke-width: 3; stroke-dasharray: 9 7; fill: none; marker-end: url(#pending-arrow); }
+    </style>
+  </defs>
+  <rect width="1440" height="820" rx="24" fill="#ffffff" />
+  <text x="56" y="66" class="title">Skill Tree 共用後端</text>
+  <text x="56" y="96" class="subtitle">已具備的服務與仍待跨模組驗收的界線</text>
+
+  <text x="56" y="151" class="section">應用模組</text>
+  <text x="544" y="151" class="section">共用 Express API / backend services</text>
+  <text x="1084" y="151" class="section">PostgreSQL</text>
+
+  <rect x="56" y="180" width="400" height="106" rx="16" class="card" />
+  <text x="80" y="216" class="card-title">A · 會員與個人資料</text>
+  <text x="80" y="245" class="card-copy">登入、profile、onboarding 和共用 session</text>
+  <text x="80" y="268" class="small">註冊寄歡迎信；重設密碼使用六位數碼</text>
+
+  <rect x="56" y="310" width="400" height="106" rx="16" class="card" />
+  <text x="80" y="346" class="card-title">B · 技能目錄與進度畫面</text>
+  <text x="80" y="375" class="card-copy">技能目錄、會員進度、歷史 API 已提供</text>
+  <text x="80" y="398" class="small">B 畫面串接與正式目錄資料仍待驗收</text>
+
+  <rect x="56" y="440" width="400" height="106" rx="16" class="pending" />
+  <text x="80" y="476" class="card-title">C · 測驗流程</text>
+  <text x="80" y="505" class="card-copy">建立／取題在 C PR #93，尚未合併</text>
+  <text x="80" y="528" class="small">E availability／history 可用；作答結算待完成</text>
+
+  <rect x="56" y="570" width="400" height="106" rx="16" class="pending" />
+  <text x="80" y="606" class="card-title">D · XP 與遊戲化</text>
+  <text x="80" y="635" class="card-copy">XP worker、入帳規則與畫面串接待 D 完成</text>
+  <text x="80" y="658" class="small">Outbox schema／首通事件服務已建立</text>
+
+  <rect x="520" y="180" width="500" height="496" rx="20" class="api" />
+  <text x="552" y="222" class="card-title">共用 API 邊界</text>
+  <text x="552" y="254" class="card-copy">會員／管理員 session · owner/editor 權限</text>
+  <text x="552" y="280" class="card-copy">rate limit · security headers · request ID</text>
+  <line x1="552" y1="305" x2="988" y2="305" stroke="#c6ddd0" stroke-width="2" />
+  <text x="552" y="340" class="section">已提供的 HTTP API</text>
+  <text x="552" y="373" class="card-copy">/api/auth/* · /api/me · /api/admin/*</text>
+  <text x="552" y="401" class="card-copy">GET /api/skills · /api/progress · history?skillId</text>
+  <text x="552" y="429" class="card-copy">GET /skills/:id/quiz-availability</text>
+  <text x="552" y="454" class="small">C POST/GET 建立與讀題：PR #93 尚未掛載</text>
+  <line x1="552" y1="478" x2="988" y2="478" stroke="#c6ddd0" stroke-width="2" />
+  <text x="552" y="512" class="section">Backend-only services</text>
+  <text x="552" y="543" class="card-copy">正式題庫查詢 · recordSkillCompletion()</text>
+  <text x="552" y="571" class="card-copy">enqueueSkillFirstPassXpEvent()</text>
+  <rect x="552" y="592" width="436" height="52" rx="12" fill="#ffffff" stroke="#d7e5dd" />
+  <text x="572" y="614" class="small">API Explorer、驗收頁、程式碼工作台僅在開發環境提供</text>
+  <text x="572" y="634" class="small">公開 /demo 只讀取前端合成資料，不寫入會員資料</text>
+
+  <rect x="1080" y="180" width="304" height="496" rx="20" class="database" />
+  <text x="1112" y="222" class="card-title">PostgreSQL</text>
+  <text x="1112" y="252" class="card-copy">本機基線：17</text>
+  <text x="1112" y="277" class="small">團隊 major version 仍待確認</text>
+  <line x1="1112" y1="302" x2="1352" y2="302" stroke="#d2dbef" stroke-width="2" />
+  <text x="1112" y="338" class="section">MIGRATIONS 001–012</text>
+  <text x="1112" y="373" class="card-copy">users / sessions</text>
+  <text x="1112" y="403" class="card-copy">skills / questions</text>
+  <text x="1112" y="433" class="card-copy">quiz_attempts / snapshots</text>
+  <text x="1112" y="463" class="card-copy">completions / revisions</text>
+  <text x="1112" y="493" class="card-copy">learning history view</text>
+  <text x="1112" y="523" class="card-copy">XP outbox / ledger · email reset code</text>
+  <rect x="1112" y="558" width="240" height="84" rx="12" fill="#ffffff" stroke="#d2dbef" />
+  <text x="1132" y="588" class="small">history 是唯讀 view；重設碼只存 HMAC</text>
+  <text x="1132" y="612" class="small">C 結算與 D XP worker 仍待模組整合</text>
+
+  <path d="M456 232H520" class="implemented-line" />
+  <path d="M456 362H520" class="implemented-line" />
+  <path d="M456 492H520" class="pending-line" />
+  <path d="M456 622H520" class="pending-line" />
+  <path d="M1020 428H1080" class="implemented-line" />
+  <path d="M1020 610H1080" class="pending-line" />
+
+  <line x1="56" y1="730" x2="108" y2="730" class="implemented-line" />
+  <text x="124" y="735" class="small">已實作的共用能力</text>
+  <line x1="312" y1="730" x2="364" y2="730" class="pending-line" />
+  <text x="380" y="735" class="small">待跨模組接線與驗收</text>
+  <text x="1384" y="735" text-anchor="end" class="small">E-07 僅在 B/C/D 真實流程驗收後完成</text>
+</svg>

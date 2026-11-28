@@ -85,6 +85,12 @@
   font-size: 14px;
 }
 
+.character-card-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 14px;
+}
+
 /* ---------- 斷點（Mobile-first） ---------- */
 
 /* 640px 以上：大手機，角色一排 6 個，卡片內距加大 */

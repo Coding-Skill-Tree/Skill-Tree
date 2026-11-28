@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 700" role="img" aria-labelledby="title description">
+  <title id="title">Skill Tree 本機開發工作台資料流</title>
+  <desc id="description">只讀開發工作台從 React 同源呼叫健康狀態、OpenAPI、migration 中繼資料和固定白名單原始碼；不讀取會員資料、密碼、環境變數，也不執行寫入請求。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#52756A" />
+    </marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans CJK TC", sans-serif; fill: #18342d; }
+      .title { font-size: 32px; font-weight: 700; }
+      .sub { font-size: 16px; fill: #527067; }
+      .head { font-size: 19px; font-weight: 700; }
+      .body { font-size: 14px; fill: #36574e; }
+      .small { font-size: 12px; fill: #527067; }
+      .box { fill: #f4f8f5; stroke: #c9d9d0; stroke-width: 2; }
+      .view { fill: #e8f4ee; stroke: #86b29b; stroke-width: 2; }
+      .api { fill: #edf2ff; stroke: #9baed6; stroke-width: 2; }
+      .safe { fill: #fff8ec; stroke: #d6ad70; stroke-width: 2; }
+      .arrow { stroke: #52756A; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1440" height="700" rx="24" fill="#ffffff" />
+  <text x="56" y="62" class="title">本機開發工作台</text>
+  <text x="56" y="92" class="sub">以現有 OpenAPI 和固定原始碼白名單連起 A–D 畫面、API、程式與資料庫狀態</text>
+
+  <rect x="56" y="150" width="300" height="230" rx="18" class="view" />
+  <text x="82" y="191" class="head">React 工作台 UI</text>
+  <text x="82" y="226" class="body">/workbench · Vite 開發模式</text>
+  <text x="82" y="262" class="body">會員／目錄／測驗／管理 API 篩選</text>
+  <text x="82" y="298" class="body">資料流節點和白名單程式碼導覽</text>
+  <text x="82" y="348" class="small">純文字呈現；不執行讀取到的程式碼</text>
+
+  <rect x="430" y="150" width="425" height="230" rx="18" class="api" />
+  <text x="456" y="191" class="head">同源 GET API</text>
+  <text x="456" y="226" class="body">GET /api/health</text>
+  <text x="456" y="254" class="body">GET /api/openapi.json</text>
+  <text x="456" y="282" class="body">GET /api/dev/workbench/status</text>
+  <text x="456" y="310" class="body">GET /api/dev/workbench/sources/:sourceId</text>
+  <text x="456" y="348" class="small">固定 source ID；不接受路徑、SQL 或資料表參數</text>
+
+  <rect x="930" y="150" width="454" height="230" rx="18" class="box" />
+  <text x="956" y="191" class="head">固定資料來源</text>
+  <text x="956" y="226" class="body">OpenAPI JSON · 已註冊 endpoints</text>
+  <text x="956" y="254" class="body">schema_migrations · 名稱與套用時間</text>
+  <text x="956" y="282" class="body">固定 allowlist · A–D routes/services/migrations</text>
+  <text x="956" y="348" class="small">讀檔限專案內白名單，單檔上限 48 KiB</text>
+
+  <path d="M356 266H430" class="arrow" />
+  <path d="M855 266H930" class="arrow" />
+
+  <rect x="56" y="430" width="1328" height="190" rx="18" class="safe" />
+  <text x="86" y="472" class="head">安全邊界</text>
+  <text x="86" y="510" class="body">• `/workbench` 只在 Vite development 顯示；後端工作台 API 在 production 不註冊。</text>
+  <text x="86" y="542" class="body">• 全部操作是 GET；migration 只回檔名和套用時間，不回 checksum、會員列、密碼或 session。</text>
+  <text x="86" y="574" class="body">• 程式碼來源不可任意選路徑；API Explorer 是另一個可送出寫入請求的工具，需只連本機測試資料庫。</text>
+</svg>

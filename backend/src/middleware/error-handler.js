@@ -13,20 +13,28 @@ export function notFound(_request, _response, next) {
 export function errorHandler(error, request, response, _next) {
   const parserError = error.type === 'entity.parse.failed' || error.type === 'entity.too.large';
   const known = error instanceof HttpError;
-  const status = known ? error.status : error.type === 'entity.too.large' ? 413 : parserError ? 400 : 500;
-  if (!known && !parserError) console.error('Unhandled API error', { requestId: response.locals.requestId, path: request.path, error });
+  const databaseUnavailable = !known && !parserError && (
+    /^08/u.test(error.code || '')
+    || ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EHOSTUNREACH', '57P01', '57P02', '57P03'].includes(error.code)
+  );
+  const status = known ? error.status : databaseUnavailable ? 503 : error.type === 'entity.too.large' ? 413 : parserError ? 400 : 500;
+  if (!known && !parserError) {
+    console.error('Unhandled API error', {
+      requestId: response.locals.requestId,
+      path: request.path,
+      errorName: error.name,
+      errorCode: error.code,
+    });
+  }
 
   const payload = {
     success: false,
     error: {
-      code: known ? error.code : error.type === 'entity.too.large' ? 'PAYLOAD_TOO_LARGE' : parserError ? 'INVALID_JSON' : 'INTERNAL_ERROR',
-      message: known ? error.message : error.type === 'entity.too.large' ? '請求內容超過大小限制' : parserError ? 'JSON 格式錯誤' : '系統發生錯誤，請稍後再試',
+      code: known ? error.code : databaseUnavailable ? 'DATABASE_UNAVAILABLE' : error.type === 'entity.too.large' ? 'PAYLOAD_TOO_LARGE' : parserError ? 'INVALID_JSON' : 'INTERNAL_ERROR',
+      message: known ? error.message : databaseUnavailable ? '資料庫暫時無法連線' : error.type === 'entity.too.large' ? '請求內容超過大小限制' : parserError ? 'JSON 格式錯誤' : '系統發生錯誤，請稍後再試',
       requestId: response.locals.requestId,
     },
   };
-  if (known && error.details !== undefined) {
-    payload.error.details = error.details;
-    if (error.details?.fields) payload.error.fields = error.details.fields;
-  }
+  if (known && error.details?.fields) payload.error.fields = error.details.fields;
   response.status(status).json(payload);
 }

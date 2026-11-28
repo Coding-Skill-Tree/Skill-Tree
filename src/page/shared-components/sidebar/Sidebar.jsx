@@ -1,4 +1,3 @@
-import React from "react";
 import Icon from "./Icon.jsx";
 // 導覽項目：key 同時當作 icon 名稱，activePage 傳入對應的 key 來標示目前頁面
 const NAV_ITEMS = [
@@ -53,8 +52,12 @@ export default function Sidebar({ stats, activePage = "map", nickname = "前端�
           {avatar ? <img src={avatar.image} alt="" /> : "ST"}
         </div>
         <h2>{nickname}</h2>
-        <p>Lv. {stats.level}</p>
-        <p>累積經驗值：{stats.xp.toLocaleString()} XP</p>
+        {stats && (
+          <>
+            <p>Lv. {stats.level}</p>
+            <p>累積經驗值：{stats.xp.toLocaleString()} XP</p>
+          </>
+        )}
       </section>
       <blockquote className="daily-quote">
         <p>今天學一點，明天的你會更強！</p>

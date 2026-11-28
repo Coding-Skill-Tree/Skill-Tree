@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import pg from 'pg';
+import { runtimeConfig } from '../lib/runtime-config.js';
 
 const { Pool } = pg;
 
@@ -9,10 +10,10 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: Number(process.env.DB_POOL_MAX || 10),
+  max: runtimeConfig.databasePoolMax,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
-  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: true } : undefined,
+  ssl: runtimeConfig.databaseSsl ? { rejectUnauthorized: true } : undefined,
 });
 
 pool.on('error', (error) => {

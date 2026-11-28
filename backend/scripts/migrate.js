@@ -3,13 +3,13 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { pool, closePool } from '../src/db/pool.js';
+import { migrationPool, closeMigrationPool } from '../src/db/migration-pool.js';
 
 const migrationsDirectory = fileURLToPath(new URL('../migrations/', import.meta.url));
 const lockKey = 746_821_114;
 
 try {
-  const client = await pool.connect();
+  const client = await migrationPool.connect();
   try {
     await client.query('SELECT pg_advisory_lock($1)', [lockKey]);
     await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -47,5 +47,5 @@ try {
   console.error('Database migration failed:', error.message);
   process.exitCode = 1;
 } finally {
-  await closePool();
+  await closeMigrationPool();
 }

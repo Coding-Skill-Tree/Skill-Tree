@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { PROFILE_TEXT, ROUTES } from "../../data/profileContent.js";
 import { formatJoinDate } from "../../utils/formatJoinDate.js";
-import { updateMe } from "../../utils/fakeSessionApi.js";
+import { ApiRequestError } from "../../../../../services/api.js";
+import { updateMe } from "../../../../../services/memberAuth.js";
 // 角色圖片、角色選擇、暱稱欄位與暱稱規則都沿用建立角色頁，確保兩頁一致
 import { AVATARS } from "../../../onboarding/data/characterOptions.js";
 import { validateNickname } from "../../../onboarding/utils/validateNickname.js";
@@ -74,22 +75,22 @@ function BasicInfo({ user, onSaved, onNotice }) {
     }
 
     setSaving(true);
-    const result = await updateMe({ username: trimmed, avatarId }).catch(() => null);
-    setSaving(false);
-
-    const status = result?.status;
-    const body = result?.body;
-    if (status === 200 && body?.success) {
-      onSaved(body.data);
+    try {
+      const updatedUser = await updateMe({ username: trimmed, avatarId });
+      onSaved(updatedUser);
       setEditing(false);
-    } else if (status === 401) {
-      window.location.replace(ROUTES.login);
-    } else if (status === 409 && body?.error?.code === "USERNAME_TAKEN") {
-      showNicknameError(PROFILE_TEXT.usernameTaken);
-    } else if (status === 422 && body?.error?.fields?.username) {
-      showNicknameError(body.error.fields.username);
-    } else {
-      onNotice(PROFILE_TEXT.saveFailed); // 網路錯誤、5xx、其他欄位錯誤
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 401) {
+        window.location.replace(ROUTES.login);
+      } else if (error instanceof ApiRequestError && error.code === "USERNAME_TAKEN") {
+        showNicknameError(error.message || PROFILE_TEXT.usernameTaken);
+      } else if (error instanceof ApiRequestError && error.fields?.username) {
+        showNicknameError(error.fields.username);
+      } else {
+        onNotice(PROFILE_TEXT.saveFailed);
+      }
+    } finally {
+      setSaving(false);
     }
   }
 

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="760" viewBox="0 0 1440 760" role="img" aria-labelledby="title desc">
+  <title id="title">Skill Tree 會員註冊與密碼重設流程</title>
+  <desc id="desc">新註冊在同一交易建立會員、profile 與登入 session，不需驗證信即可接續 onboarding；忘記密碼寄出六位數驗證碼，驗證成功後更新密碼並撤銷所有會員 session。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#101914"/><stop offset="1" stop-color="#18231b"/></linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#a8d66d"/><stop offset="1" stop-color="#6fa84b"/></linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8aa16b"/></marker>
+    <style>
+      .title{font:700 30px system-ui,-apple-system,sans-serif;fill:#eef4e9}.sub{font:400 15px system-ui,-apple-system,sans-serif;fill:#aab7a3}
+      .lane{font:700 14px system-ui,-apple-system,sans-serif;fill:#bdceaa;letter-spacing:1.6px}.box{fill:#1e2b21;stroke:#40523a;stroke-width:1.5;rx:16}
+      .user{fill:#222a33;stroke:#45515c}.api{fill:#213023;stroke:#64834d}.mail{fill:#292b21;stroke:#777147}.db{fill:#242837;stroke:#555d83}
+      .head{font:650 17px system-ui,-apple-system,sans-serif;fill:#f0f4eb}.body{font:400 13px system-ui,-apple-system,sans-serif;fill:#b9c5b2}.code{font:600 12px ui-monospace,SFMono-Regular,monospace;fill:#c9e4a9}
+      .line{stroke:#8aa16b;stroke-width:2;fill:none;marker-end:url(#arrow)}.note{fill:#151d18;stroke:#384838;stroke-width:1;rx:12}.noteText{font:400 12px system-ui,-apple-system,sans-serif;fill:#aebba7}
+    </style>
+  </defs>
+  <rect width="1440" height="760" fill="url(#bg)"/>
+  <text x="64" y="66" class="title">會員 Email 流程</text>
+  <text x="64" y="96" class="sub">A 的會員體驗 × E 的共用身份 API；畫面與 API 都使用相同的驗證規則</text>
+
+  <text x="66" y="148" class="lane">註冊：免 Email 驗證</text>
+  <rect x="64" y="172" width="250" height="106" class="box user"/>
+  <text x="88" y="207" class="head">1. 使用者註冊</text><text x="88" y="234" class="body">Email + 密碼</text>
+  <path d="M314 225H412" class="line"/>
+  <rect x="420" y="172" width="330" height="106" class="box api"/>
+  <text x="444" y="207" class="head">2. 共用 API 建立帳號</text><text x="444" y="234" class="code">POST /api/auth/register</text><text x="444" y="257" class="body">同交易建立 user/profile/session</text>
+  <path d="M750 225H848" class="line"/>
+  <rect x="856" y="172" width="300" height="106" class="box mail"/>
+  <text x="880" y="207" class="head">3. 寄送歡迎信</text><text x="880" y="234" class="body">不寄驗證連結</text>
+  <rect x="1190" y="185" width="190" height="82" class="note"/>
+  <text x="1210" y="217" class="noteText">回應設定</text><text x="1277" y="217" class="code">HttpOnly sid</text><text x="1210" y="241" class="noteText">接續</text><text x="1250" y="241" class="code">/onboarding</text>
+
+  <text x="66" y="350" class="lane">忘記密碼：六位數一次性驗證碼</text>
+  <rect x="64" y="376" width="250" height="112" class="box user"/>
+  <text x="88" y="412" class="head">1. 申請重設</text><text x="88" y="440" class="code">POST /forgot-password</text><text x="88" y="464" class="body">提供註冊 Email</text>
+  <path d="M314 432H380" class="line"/>
+  <rect x="388" y="376" width="310" height="112" class="box api"/>
+  <text x="412" y="412" class="head">2. 建立短效驗證碼</text><text x="412" y="440" class="body">6 位數 · 10 分鐘 · 最多錯 5 次</text><text x="412" y="464" class="body">HMAC 雜湊；每 Email 60 秒節流</text>
+  <path d="M698 432H764" class="line"/>
+  <rect x="772" y="376" width="250" height="112" class="box db"/>
+  <text x="796" y="412" class="head">3. 僅存安全摘要</text><text x="796" y="440" class="code">email_tokens</text><text x="796" y="464" class="body">不在資料庫保存明碼</text>
+  <path d="M1022 432H1088" class="line"/>
+  <rect x="1096" y="376" width="284" height="112" class="box mail"/>
+  <text x="1120" y="412" class="head">4. Email 傳送驗證碼</text><text x="1120" y="440" class="body">未知 Email 仍回相同訊息</text><text x="1120" y="464" class="body">避免洩漏會員是否存在</text>
+
+  <path d="M1238 488V566H1022" class="line"/>
+  <rect x="772" y="536" width="250" height="112" class="box user"/>
+  <text x="796" y="572" class="head">5. 使用者輸入</text><text x="796" y="600" class="body">Email + 六位數碼 + 新密碼</text>
+  <path d="M772 592H706" class="line"/>
+  <rect x="396" y="536" width="302" height="112" class="box api"/>
+  <text x="420" y="572" class="head">6. 驗證並更新密碼</text><text x="420" y="600" class="code">POST /reset-password</text><text x="420" y="624" class="body">驗證碼一次性使用</text>
+  <path d="M396 592H330" class="line"/>
+  <rect x="64" y="536" width="258" height="112" class="box api"/>
+  <text x="88" y="572" class="head">7. 撤銷現有登入</text><text x="88" y="600" class="body">刪除會員所有 sessions</text><text x="88" y="624" class="body">需要以新密碼重新登入</text>
+
+  <rect x="64" y="690" width="1316" height="38" class="note"/>
+  <text x="86" y="714" class="noteText">正式環境：SMTP + secret store 的 EMAIL_CODE_SECRET（至少 32 字元）；本機無 SMTP 時，測試郵件只輸出在 API 終端機。</text>
+</svg>

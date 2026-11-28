@@ -28,6 +28,24 @@ export function validateRegistration(email, password) {
   }
 }
 
+export function validateMemberProfile(username, avatarId) {
+  const fields = {};
+  const nickname = typeof username === 'string' ? username.trim() : '';
+  const nicknameLength = Array.from(nickname).length;
+  if (nicknameLength < 2 || nicknameLength > 12) {
+    fields.username = '暱稱需為 2 到 12 個字';
+  } else if (!/^[\p{Script=Han}A-Za-z0-9_]+$/u.test(nickname)) {
+    fields.username = '暱稱只能包含中文、英文、數字與底線';
+  }
+
+  if (typeof avatarId !== 'string' || !/^avatar-0[1-6]$/u.test(avatarId)) {
+    fields.avatarId = '請選擇有效的角色圖像';
+  }
+
+  if (Object.keys(fields).length) throw validationError(fields);
+  return { username: nickname, avatarId };
+}
+
 export function validateLogin(email, password, username = false) {
   const fields = {};
   if (username) {

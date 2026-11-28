@@ -1,0 +1,26 @@
+.team-panel { overflow: hidden; }
+.team-table-wrap { overflow-x: auto; }
+.team-table { width: 100%; border-collapse: collapse; text-align: left; }
+.team-table th,
+.team-table td { padding: 16px 18px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+.team-table th { color: var(--color-text-subtle); font-size: 11px; font-weight: 750; letter-spacing: .08em; }
+.team-table td { color: var(--color-text); font-size: 13px; }
+.team-table td strong,
+.team-table td small { display: block; }
+.team-table td small { margin-top: 4px; color: var(--color-text-subtle); font-size: 11px; }
+.team-status { display: inline-flex; padding: 5px 9px; border: 1px solid #435535; border-radius: 999px; color: #c6f36a; font-size: 11px; }
+.team-status.is-disabled { border-color: #5a3a38; color: #f0a39b; }
+.team-action { min-height: 36px; white-space: nowrap; }
+.team-owner-note,
+.team-empty,
+.team-create-note { color: var(--color-text-subtle); font-size: 13px; line-height: 1.7; }
+.team-empty { margin: 0; padding: 28px; text-align: center; }
+.team-create-note { margin: 14px 0 0; }
+.team-create-note code { color: var(--color-primary); }
+.team-role-indicator { cursor: default; }
+
+@media (max-width: 760px) {
+  .team-table th,
+  .team-table td { padding: 13px 11px; }
+  .team-role-indicator { display: none; }
+}
